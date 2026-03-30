@@ -71,4 +71,15 @@
 - [ ] 8.5 Write unit test for `streamLLM()`: Cerebras success, Cerebras timeout → Groq fallback, both fail → 503
 - [ ] 8.6 Write unit test for `buildPrompt()`: snapshot test with sample chunks + history
 - [ ] 8.7 Write component test for `MessageInput`: empty submit blocked, char limit enforced, disabled during streaming
-- [ ] 8.8 Writ
+- [ ] 8.8 Write component test for `DisclaimerBanner`: renders on load, dismiss persists to localStorage
+
+## Phase 9: Phase 2 (Documented — Do Not Implement)
+
+- [ ] 9.1 ~~PDF Export~~ — defer: `@react-pdf/renderer`, `components/pdf-export.tsx`
+- [ ] 9.2 ~~Sidebar~~ — defer: Vercel KV, `lib/rate-limit/kv-store.ts`, `app/api/sessions/route.ts`
+- [ ] 9.3 ~~Session Persistence~~ — defer: KV-backed session CRUD, TTL 24h
+- [ ] 9.4 ~~Enforced Rate Limiting~~ — defer: KV counters, actual 429 responses
+
+---
+
+**Total: 44 tasks (Phase 1-8: 40 implementable, Phase 9: 4 deferred)**
