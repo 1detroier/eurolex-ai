@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment variables (NEVER commit real keys)
+.env
+.env.local
+.env.production
+
+# Build
+build/
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (ETL)
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Generated
+seed.sql
+
+# Vercel
+.vercel/
+
+# ETL data (large files, regenerate with seed script)
+scripts/data/*.txt
+scripts/data/*.html
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+
+# Openspec (SDD artifacts)
+openspec/

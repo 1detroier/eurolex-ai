@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Next.js 14, TypeScript, Tailwind CSS, shadcn/ui, Vercel AI SDK
+  Architecture: RAG legal research assistant, App Router, Edge Middleware, Supabase pgvector
+  Deploy: Vercel (Hobby tier, free)
+  LLM: Cerebras (primary) → Groq (fallback), both llama-3.1-8b-instruct
+  Embeddings: all-MiniLM-L6-v2 (384 dim), HuggingFace Inference API for runtime
+  Database: Supabase PostgreSQL + pgvector (EU Frankfurt region)
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Document deferred features separately from MVP scope
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Document architecture decisions with rationale
+    - Include sequence diagrams for complex flows (LLM fallback, embedding pipeline)
+  tasks:
+    - Group by phase (MVP vs Post-MVP), use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns
+  apply_config:
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: "npm run build"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
