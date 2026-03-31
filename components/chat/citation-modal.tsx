@@ -31,11 +31,13 @@ export function CitationModal({
       <DialogContent className="sm:max-w-md bg-slate-900 border border-slate-700 text-white">
         <DialogHeader>
           <DialogTitle className="text-white">
-            {citation.regulation} — {citation.article}
+            {citation.regulation}
+            {citation.article ? ` — ${citation.article}` : " — General Reference"}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Retrieved from EuroLex AI context with{" "}
-            {Math.round(citation.similarity * 100)}% similarity.
+            {citation.similarity > 0
+              ? `Retrieved from EuroLex AI context with ${Math.round(citation.similarity * 100)}% similarity.`
+              : "Referenced in the AI response."}
           </DialogDescription>
         </DialogHeader>
 

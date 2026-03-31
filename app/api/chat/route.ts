@@ -227,6 +227,7 @@ export async function POST(request: NextRequest) {
                       celexId: citation.celex_id,
                       eurlexUrl: citation.eurlex_url,
                       excerpt,
+                      similarity: citation.similarity,
                     })
                   )
                 );

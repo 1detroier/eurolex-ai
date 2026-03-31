@@ -22,7 +22,9 @@ export function CitationBadge({ citation, onOpenModal }: CitationBadgeProps) {
         onClick={() => onOpenModal(citation)}
       >
         <span>
-          {citation.regulation} {citation.article}
+          {citation.article
+            ? `${citation.regulation} ${citation.article.replace("Article ", "Art. ")}`
+            : citation.regulation}
         </span>
         <ExternalLink className="h-3 w-3 opacity-60" />
       </TooltipTrigger>

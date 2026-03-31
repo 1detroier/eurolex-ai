@@ -13,6 +13,7 @@ interface CitationEventData {
   celexId: string;
   eurlexUrl: string;
   excerpt: string;
+  similarity: number;
 }
 
 interface ChatContainerProps {
@@ -135,7 +136,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
                       celex_id: citeData.celexId,
                       eurlex_url: citeData.eurlexUrl,
                       chunk_content: citeData.excerpt,
-                      similarity: 0,
+                      similarity: citeData.similarity ?? 0,
                     };
 
                     setMessages((prev) => {

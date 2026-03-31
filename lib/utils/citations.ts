@@ -112,7 +112,11 @@ export function parseCitations(text: string, chunks: LegalChunk[]): Citation[] {
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
+    // Try to find a chunk with a known article first, then any chunk
     const regChunk = chunks.find(
+      (c) => normalizeRegulation(c.metadata.regulation) === normalizeRegulation(regulationRaw)
+        && c.metadata.article !== "Unknown"
+    ) ?? chunks.find(
       (c) => normalizeRegulation(c.metadata.regulation) === normalizeRegulation(regulationRaw)
     );
 
