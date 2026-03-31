@@ -11,10 +11,8 @@ interface ChatMessageProps {
 }
 
 /**
- * Renders text with inline citations as clickable links.
- * Supports both formats:
- *   (GDPR-Article 17) — with article number
- *   (GDPR)            — regulation only
+ * Renders text with inline [[citation]] markers as clickable links.
+ * Format: [[GDPR-Article 5]] or [[GDPR]]
  */
 function InlineCitationText({
   text,
@@ -25,8 +23,7 @@ function InlineCitationText({
   citations: Citation[];
   onOpenCitationModal: (citation: Citation) => void;
 }) {
-  // Combined regex: matches both (Reg-Article N) and (Regulation Name)
-  const citationRegex = /\(([A-Za-z][A-Za-z\s]*?)(?:-Article\s+(\d+))?\)/gi;
+  const citationRegex = /\[\[([A-Za-z][A-Za-z\s]*?)(?:-Article\s+(\d+))?\]\]/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -37,10 +34,9 @@ function InlineCitationText({
     }
 
     const regulation = match[1].trim();
-    const article = match[2]; // undefined if no article
+    const article = match[2];
     const fullMatch = match[0];
 
-    // Find matching citation
     const citation = article
       ? citations.find(
           (c) =>
@@ -62,16 +58,16 @@ function InlineCitationText({
             e.preventDefault();
             onOpenCitationModal(citation);
           }}
-          className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:bg-primary/10 hover:decoration-primary cursor-pointer"
+          className="inline-flex items-center gap-0.5 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20 cursor-pointer border border-primary/20"
           title={article ? `${regulation} — Article ${article}` : regulation}
         >
-          {fullMatch}
+          {regulation}{article ? ` Art. ${article}` : ""}
         </a>
       );
     } else {
       parts.push(
-        <span key={`plain-${match.index}`} className="text-muted-foreground">
-          {fullMatch}
+        <span key={`plain-${match.index}`} className="text-muted-foreground text-xs">
+          {regulation}{article ? ` Art. ${article}` : ""}
         </span>
       );
     }

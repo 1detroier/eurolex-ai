@@ -1,6 +1,8 @@
 /**
- * Citation parser — extracts (REGULATION-Article N) and (REGULATION) markers
+ * Citation parser — extracts [[REGULATION-Article N]] and [[REGULATION]] markers
  * from LLM responses and maps them to EUR-Lex URLs using the retrieved chunks.
+ *
+ * Uses double square brackets to avoid conflicts with legal text parentheticals.
  */
 import type { Citation, LegalChunk } from "@/types/legal";
 
@@ -8,28 +10,16 @@ import type { Citation, LegalChunk } from "@/types/legal";
 // Regex patterns
 // ---------------------------------------------------------------------------
 
-/**
- * Matches citations WITH article number:
- *   (GDPR-Article 17), (AI Act-Article 4), (Digital Services Act-Article 34)
- */
-const CITATION_WITH_ARTICLE_REGEX = /\(([A-Za-z\s]+?)-Article\s+(\d+)\)/gi;
+/** Matches [[Regulation-Article N]] */
+const CITATION_WITH_ARTICLE_REGEX = /\[\[([A-Za-z\s]+?)-Article\s+(\d+)\]\]/gi;
 
-/**
- * Matches citations WITHOUT article number (just regulation):
- *   (GDPR), (AI Act), (Digital Services Act)
- */
-const CITATION_NO_ARTICLE_REGEX = /\(([A-Za-z][A-Za-z\s]+?)\)/g;
+/** Matches [[Regulation]] (no article) */
+const CITATION_NO_ARTICLE_REGEX = /\[\[([A-Za-z][A-Za-z\s]+?)\]\]/g;
 
-/**
- * Known regulation names to distinguish from other parenthetical text.
- */
-const KNOWN_REGULATIONS = [
-  "gdpr", "ai act", "digital services act", "digital markets act",
-];
+/** Known regulation names */
+const KNOWN_REGULATIONS = ["gdpr", "ai act", "digital services act", "digital markets act"];
 
-/**
- * Matches an article number from a chunk's metadata.article field.
- */
+/** Extract article number from metadata */
 const ARTICLE_NUM_REGEX = /(?:Article|Art\.?)\s+(\d+)/i;
 
 // ---------------------------------------------------------------------------
@@ -58,44 +48,31 @@ function isKnownRegulation(name: string): boolean {
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Parse citation markers from an LLM response and match them against
- * the chunks that were used for context.
- *
- * Handles two formats:
- *   (GDPR-Article 5)  → citation with specific article
- *   (GDPR)            → citation to regulation only (no article)
- *
- * @param text - The LLM response text containing citation markers
- * @param chunks - The legal chunks used as context for this response
- * @returns Deduplicated Citation objects with EUR-Lex URLs
- */
 export function parseCitations(text: string, chunks: LegalChunk[]): Citation[] {
   const citations: Citation[] = [];
   const seen = new Set<string>();
 
-  // ── Parse (Regulation-Article N) citations ──
   let match: RegExpExecArray | null;
+
+  // ── Parse [[Regulation-Article N]] citations ──
   CITATION_WITH_ARTICLE_REGEX.lastIndex = 0;
 
   while ((match = CITATION_WITH_ARTICLE_REGEX.exec(text)) !== null) {
     const regulationRaw = match[1].trim();
     const articleNumber = match[2];
 
-    // Skip malformed citations with "unknown"
-    if (/unknown/i.test(articleNumber)) continue;
+    // Skip malformed
     if (!/^\d+$/.test(articleNumber)) continue;
 
     const dedupeKey = `${normalizeRegulation(regulationRaw)}:art${articleNumber}`;
-
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
     const matchedChunk = chunks.find((chunk) => {
-      const chunkRegulation = normalizeRegulation(chunk.metadata.regulation);
-      const citeRegulation = normalizeRegulation(regulationRaw);
-      const chunkArticleNum = extractArticleNumber(chunk.metadata.article);
-      return chunkRegulation === citeRegulation && chunkArticleNum === articleNumber;
+      const chunkReg = normalizeRegulation(chunk.metadata.regulation);
+      const citeReg = normalizeRegulation(regulationRaw);
+      const chunkArtNum = extractArticleNumber(chunk.metadata.article);
+      return chunkReg === citeReg && chunkArtNum === articleNumber;
     });
 
     if (matchedChunk) {
@@ -109,7 +86,6 @@ export function parseCitations(text: string, chunks: LegalChunk[]): Citation[] {
         similarity: matchedChunk.similarity,
       });
     } else {
-      // Try to find any chunk from this regulation for CELEX ID
       const regChunk = chunks.find(
         (c) => normalizeRegulation(c.metadata.regulation) === normalizeRegulation(regulationRaw)
       );
@@ -125,7 +101,7 @@ export function parseCitations(text: string, chunks: LegalChunk[]): Citation[] {
     }
   }
 
-  // ── Parse (Regulation) citations without article number ──
+  // ── Parse [[Regulation]] citations without article ──
   CITATION_NO_ARTICLE_REGEX.lastIndex = 0;
 
   while ((match = CITATION_NO_ARTICLE_REGEX.exec(text)) !== null) {

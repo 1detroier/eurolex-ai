@@ -13,7 +13,7 @@ export function buildSystemPrompt(chunks: LegalChunk[]): string {
   const contextBlock = chunks.length > 0
     ? chunks
         .map(
-          (chunk, i) => {
+          (chunk) => {
             const hasArticle = chunk.metadata.article && chunk.metadata.article !== "Unknown";
             const sourceLabel = hasArticle
               ? `[${chunk.metadata.regulation} - ${chunk.metadata.article}]`
@@ -28,20 +28,20 @@ export function buildSystemPrompt(chunks: LegalChunk[]): string {
 
 RULES:
 1. Answer based ONLY on the provided legal context below. Do not use outside knowledge.
-2. To cite a regulation, use ONE of these formats INLINE:
-   - With article number: (GDPR-Article 5), (AI Act-Article 4), (Digital Services Act-Article 34)
-   - Without article number: (GDPR), (AI Act), (Digital Services Act)
-3. ONLY use format with article number when the source label shows a specific number like "Article 5". If the label says "chunk N", use the format WITHOUT article number.
-4. NEVER write "unknown", "Unknown", or "unknown clause" in any citation. This is strictly forbidden.
+2. To cite a regulation, use DOUBLE SQUARE BRACKETS with this exact format:
+   - With article number: [[GDPR-Article 5]], [[AI Act-Article 4]]
+   - Without article number: [[GDPR]], [[AI Act]]
+3. ONLY include article number when the source label shows one. If no article is shown, cite only the regulation: [[GDPR]]
+4. NEVER write "unknown" in any citation. NEVER use parentheses () for citations.
 5. Use EXACT regulation names: "GDPR", "AI Act", "Digital Services Act", "Digital Markets Act".
 6. Place citations after the claim they support.
 7. If context is insufficient, say so clearly.
 8. Always end with legal disclaimer.
 
-EXAMPLES of correct citations:
-- "Personal data must be processed lawfully (GDPR-Article 5)."
-- "The regulation establishes data protection principles (GDPR)."
-- "High-risk AI systems require conformity assessment (AI Act-Article 43)."
+EXAMPLES:
+- "Personal data must be processed lawfully [[GDPR-Article 5]]."
+- "The regulation establishes data protection principles [[GDPR]]."
+- "Controllers must implement data protection by design [[GDPR-Article 25]]."
 
 LEGAL CONTEXT:
 ${contextBlock}
