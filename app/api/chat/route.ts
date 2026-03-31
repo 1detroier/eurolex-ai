@@ -137,8 +137,7 @@ export async function POST(request: NextRequest) {
   let chunks: LegalChunk[] = [];
 
   try {
-    console.log(`[chat] Embedding dims: ${embedding.length}, first 3: ${embedding.slice(0, 3)}`);
-    console.log(`[chat] Search params: count=${CHUNK_COUNT}, threshold=${SIMILARITY_THRESHOLD}, regulation=${regulation}`);
+    console.log(`[chat] Embedding dims: ${embedding.length}`);
     const results = await matchLegalChunks(
       embedding,
       CHUNK_COUNT,
@@ -189,11 +188,6 @@ export async function POST(request: NextRequest) {
                 sseEvent("done", {
                   provider,
                   chunksFound: chunks.length,
-                  debug: {
-                    embeddingDims: embedding.length,
-                    threshold: SIMILARITY_THRESHOLD,
-                    count: CHUNK_COUNT,
-                  },
                 })
               )
             );
