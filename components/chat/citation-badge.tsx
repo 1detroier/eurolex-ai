@@ -18,7 +18,7 @@ export function CitationBadge({ citation, onOpenModal }: CitationBadgeProps) {
   return (
     <Tooltip>
       <TooltipTrigger
-        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[hsl(var(--accent-50)/0.2)] bg-[hsl(var(--accent-50)/0.08)] px-2 py-0.5 text-xs font-medium text-[hsl(var(--accent-60))] transition-colors hover:bg-[hsl(var(--accent-50)/0.15)]"
         onClick={() => onOpenModal(citation)}
       >
         <span>
@@ -26,7 +26,7 @@ export function CitationBadge({ citation, onOpenModal }: CitationBadgeProps) {
             ? `${citation.regulation} ${citation.article.replace("Article ", "Art. ")}`
             : citation.regulation}
         </span>
-        <ExternalLink className="h-3 w-3 opacity-60" />
+        <ExternalLink className="h-3 w-3 opacity-50" />
       </TooltipTrigger>
       <TooltipContent side="top">
         {citation.chunk_content ? (
@@ -36,7 +36,7 @@ export function CitationBadge({ citation, onOpenModal }: CitationBadgeProps) {
               : citation.chunk_content}
           </p>
         ) : (
-          <p>Source not in retrieved context</p>
+          <p>Click to view source</p>
         )}
       </TooltipContent>
     </Tooltip>

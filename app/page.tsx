@@ -3,16 +3,24 @@ import { ChatLayout } from "@/components/chat/chat-layout";
 
 export default function Home() {
   return (
-    <div className="flex h-screen flex-col">
-      {/* Header */}
-      <header className="shrink-0 border-b bg-background px-4 py-4 sm:py-6 md:pl-[calc(16rem+1rem)]">
-        <div className="mx-auto max-w-[800px] text-center">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            EuroLex AI
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your AI-powered assistant for European Union law
-          </p>
+    <div className="flex h-screen flex-col bg-background">
+      {/* Header — Factorial clean style */}
+      <header className="shrink-0 border-b border-border bg-background">
+        <div className="flex h-14 items-center justify-between px-4 md:pl-64">
+          <div className="flex items-center gap-3">
+            {/* Logo placeholder */}
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
+              EL
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold leading-tight text-foreground">
+                EuroLex AI
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                European legislation assistant
+              </p>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -23,15 +31,6 @@ export default function Home() {
       <main className="flex flex-1 overflow-hidden">
         <ChatLayout />
       </main>
-
-      {/* Footer */}
-      <footer className="shrink-0 border-t px-4 py-3 text-center text-xs text-muted-foreground md:pl-[calc(16rem+1rem)]">
-        <p>
-          EuroLex AI uses AI to retrieve and summarize EU legislation. Responses
-          are informational only and do not constitute legal advice. Always
-          consult a qualified professional.
-        </p>
-      </footer>
     </div>
   );
 }

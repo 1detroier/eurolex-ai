@@ -4,101 +4,123 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   FACTORIAL F0 DESIGN SYSTEM
+   Source: https://github.com/factorialco/f0
+   All colors in HSL format (H S% L%)
+   ============================================================ */
+
 @layer base {
   :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
+    /* ── Neutral scale ── */
+    --neutral-0: 0 0% 100%;
+    --neutral-5: 220 88% 17% / 0.04;
+    --neutral-10: 216 89% 18% / 0.06;
+    --neutral-20: 214 70% 20% / 0.1;
+    --neutral-30: 213 87% 15% / 0.20;
+    --neutral-40: 219 97% 15% / 0.45;
+    --neutral-50: 217 96% 11% / 0.61;
+    --neutral-60: 220 88% 10% / 0.82;
+    --neutral-70: 219 91% 8% / 0.88;
+    --neutral-80: 219 94% 7% / 0.9;
+    --neutral-90: 219 88% 6% / 0.92;
+    --neutral-100: 218 48% 10%;
 
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
+    /* ── Accent (radical = Factorial pink-red) ── */
+    --accent-50: 348 80% 50%;
+    --accent-60: 348 80% 42%;
+    --accent-70: 347 80% 34%;
 
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
+    /* ── Semantic ── */
+    --critical-50: 5 100% 65%;
+    --critical-70: 3 71% 41%;
+    --positive-50: 160 84% 39%;
+    --positive-70: 161 84% 27%;
+    --warning-50: 25 95% 53%;
+    --info-50: 216 90% 65%;
+    --info-70: 216 48% 44%;
+    --selected-50: 184 92% 35%;
+    --selected-60: 184 92% 28%;
+    --selected-70: 184 92% 24%;
 
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
+    /* ── Ring / Focus ── */
+    --ring: var(--selected-50);
 
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
+    /* ── Shadcn semantic tokens (mapped to Factorial) ── */
+    --background: hsl(var(--neutral-0));
+    --foreground: hsl(var(--neutral-100));
+    --card: hsl(var(--neutral-0));
+    --card-foreground: hsl(var(--neutral-100));
+    --popover: hsl(var(--neutral-0));
+    --popover-foreground: hsl(var(--neutral-100));
+    --primary: hsl(var(--accent-50));
+    --primary-foreground: 0 0% 100%;
+    --secondary: hsl(var(--neutral-10));
+    --secondary-foreground: hsl(var(--neutral-100));
+    --muted: hsl(var(--neutral-10));
+    --muted-foreground: hsl(var(--neutral-50));
+    --accent: hsl(var(--accent-50) / 0.08);
+    --accent-foreground: hsl(var(--accent-70));
+    --destructive: hsl(var(--critical-50));
+    --destructive-foreground: 0 0% 100%;
+    --border: hsl(var(--neutral-20));
+    --input: hsl(var(--neutral-20));
 
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: 210 40% 98%;
-
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-
+    /* ── Border radius (Factorial: 10px default) ── */
     --radius: 0.625rem;
 
-    --chart-1: oklch(0.87 0 0);
-
-    --chart-2: oklch(0.556 0 0);
-
-    --chart-3: oklch(0.439 0 0);
-
-    --chart-4: oklch(0.371 0 0);
-
-    --chart-5: oklch(0.269 0 0);
-
-    --sidebar: oklch(0.985 0 0);
-
-    --sidebar-foreground: oklch(0.145 0 0);
-
-    --sidebar-primary: oklch(0.205 0 0);
-
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-
-    --sidebar-accent: oklch(0.97 0 0);
-
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-
-    --sidebar-border: oklch(0.922 0 0);
-
-    --sidebar-ring: oklch(0.708 0 0);
+    /* ── Sidebar ── */
+    --sidebar: hsl(var(--neutral-0));
+    --sidebar-foreground: hsl(var(--neutral-100));
+    --sidebar-primary: hsl(var(--accent-50));
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: hsl(var(--neutral-5));
+    --sidebar-accent-foreground: hsl(var(--neutral-100));
+    --sidebar-border: hsl(var(--neutral-20));
+    --sidebar-ring: hsl(var(--ring));
   }
+
   .theme {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
   }
+
   .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    /* ── Dark neutral (inverted) ── */
+    --neutral-0: 218 48% 10%;
+    --neutral-5: 0 0% 100% / 0.05;
+    --neutral-10: 0 0% 100% / 0.1;
+    --neutral-20: 0 0% 100% / 0.2;
+    --neutral-30: 0 0% 100% / 0.3;
+    --neutral-40: 0 0% 100% / 0.4;
+    --neutral-50: 0 0% 100% / 0.5;
+    --neutral-60: 0 0% 100% / 0.6;
+    --neutral-70: 0 0% 100% / 0.7;
+    --neutral-80: 0 0% 100% / 0.8;
+    --neutral-90: 0 0% 100% / 0.9;
+    --neutral-100: 0 0% 100%;
+
+    --background: hsl(var(--neutral-0));
+    --foreground: hsl(var(--neutral-100));
+    --card: 218 48% 12%;
+    --card-foreground: hsl(var(--neutral-100));
+    --popover: 218 48% 12%;
+    --popover-foreground: hsl(var(--neutral-100));
+    --primary: hsl(var(--accent-50));
+    --primary-foreground: 0 0% 100%;
+    --secondary: hsl(var(--neutral-10));
+    --secondary-foreground: hsl(var(--neutral-100));
+    --muted: hsl(var(--neutral-10));
+    --muted-foreground: hsl(var(--neutral-50));
+    --border: hsl(var(--neutral-20));
+    --input: hsl(var(--neutral-20));
+
+    --sidebar: 218 48% 12%;
+    --sidebar-foreground: hsl(var(--neutral-100));
+    --sidebar-accent: hsl(var(--neutral-10));
+    --sidebar-border: hsl(var(--neutral-20));
   }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -114,41 +136,27 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
   }
 }
 
-/* Professional legal theme additions */
+/* ============================================================
+   FACTORIAL-STYLE UTILITIES
+   ============================================================ */
 @layer utilities {
-  .legal-gradient {
-    background: linear-gradient(135deg, hsl(222.2 84% 4.9%) 0%, hsl(217.2 32.6% 17.5%) 100%);
-  }
-
-  .legal-card {
-    @apply bg-card border-border shadow-lg rounded-lg;
-  }
-
-  .legal-text-muted {
-    @apply text-muted-foreground;
-  }
-
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+    scrollbar-color: hsl(var(--neutral-30)) transparent;
   }
-
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
   }
-
   .scrollbar-thin::-webkit-scrollbar-track {
-    background: hsl(var(--background));
+    background: transparent;
   }
-
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted));
+    background-color: hsl(var(--neutral-30));
     border-radius: 3px;
   }
 }
