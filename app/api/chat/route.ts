@@ -137,6 +137,8 @@ export async function POST(request: NextRequest) {
   let chunks: LegalChunk[] = [];
 
   try {
+    console.log(`[chat] Embedding dims: ${embedding.length}, first 3: ${embedding.slice(0, 3)}`);
+    console.log(`[chat] Search params: count=${CHUNK_COUNT}, threshold=${SIMILARITY_THRESHOLD}, regulation=${regulation}`);
     const results = await matchLegalChunks(
       embedding,
       CHUNK_COUNT,
@@ -145,6 +147,7 @@ export async function POST(request: NextRequest) {
     );
     // SearchResult and LegalChunk have the same shape — safe cast
     chunks = results as LegalChunk[];
+    console.log(`[chat] Search returned ${chunks.length} chunks`);
   } catch (error) {
     // Supabase failure is non-fatal — the LLM can still answer general questions
     console.error("[chat] Supabase search failed, continuing without context:", error);
@@ -186,6 +189,11 @@ export async function POST(request: NextRequest) {
                 sseEvent("done", {
                   provider,
                   chunksFound: chunks.length,
+                  debug: {
+                    embeddingDims: embedding.length,
+                    threshold: SIMILARITY_THRESHOLD,
+                    count: CHUNK_COUNT,
+                  },
                 })
               )
             );
