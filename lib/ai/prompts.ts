@@ -43,6 +43,8 @@ EXAMPLES:
 - "The regulation establishes data protection principles [[GDPR]]."
 - "Controllers must implement data protection by design [[GDPR-Article 25]]."
 
+CRITICAL: Article numbers must be NUMBERS only (1, 5, 17, 25). NEVER use single letters (a, b, c, d) as article numbers.
+
 LEGAL CONTEXT:
 ${contextBlock}
 

@@ -51,9 +51,21 @@ const SSE_HEADERS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Format an SSE event string.
- * Follows the SSE spec: `event: <type>\ndata: <json>\n\n`
+ * Clean malformed citation markers from text.
+ * Removes [[X]] where X is not a known regulation or valid article number.
+ * Valid: [[GDPR]], [[GDPR-Article 5]], [[AI Act-Article 4]]
+ * Invalid: [[GDPR-d]], [[GDPR-unknown]], [[foo]]
  */
+const KNOWN_REGULATIONS = ["gdpr", "ai act", "digital services act", "digital markets act"];
+
+function cleanMalformedCitations(text: string): string {
+  // Remove [[...]] with single-letter "articles" like [[GDPR-d]]
+  text = text.replace(/\[\[([A-Za-z\s]+?)-[a-d]\]\]/gi, "[$1]");
+  // Remove [[...]] with "unknown"
+  text = text.replace(/\[\[([A-Za-z\s]+?)-unknown[^\]]*\]\]/gi, "[$1]");
+  return text;
+}
+
 function sseEvent(type: string, data: unknown): string {
   return `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -182,9 +194,12 @@ export async function POST(request: NextRequest) {
           // Accumulate text for citation parsing
           accumulatedText += textChunk;
 
+          // Clean malformed citations from the chunk before emitting
+          const cleanedChunk = cleanMalformedCitations(textChunk);
+
           // Emit chunk event to client
           controller.enqueue(
-            encoder.encode(sseEvent("chunk", { content: textChunk }))
+            encoder.encode(sseEvent("chunk", { content: cleanedChunk }))
           );
 
           // ── Parse citations from accumulated text ──
