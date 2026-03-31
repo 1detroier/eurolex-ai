@@ -60,11 +60,11 @@ const KNOWN_REGULATIONS = ["gdpr", "ai act", "digital services act", "digital ma
 
 function cleanMalformedCitations(text: string): string {
   // Remove [[...]] with single-letter "articles" like [[GDPR-d]] or [[GDPR-(d)]]
-  text = text.replace(/\[\[([A-Za-z\s]+?)-\(?\s*[a-d]\s*\)?\]\]/gi, "[$1]");
+  text = text.replace(/\[\[([A-Za-z\s]+?)-\(?\s*[a-d]\s*\)?\]\]/gi, "[[$1]]");
   // Remove [[...]] with "unknown"
-  text = text.replace(/\[\[([A-Za-z\s]+?)-unknown[^\]]*\]\]/gi, "[$1]");
-  // Remove [[...]] with anything that's not a number after dash
-  text = text.replace(/\[\[([A-Za-z\s]+?)-(?!Article\s+\d)[^\]]+\]\]/gi, "[$1]");
+  text = text.replace(/\[\[([A-Za-z\s]+?)-unknown[^\]]*\]\]/gi, "[[$1]]");
+  // Remove [[...]] with anything that's not a valid "Article N" after dash
+  text = text.replace(/\[\[([A-Za-z\s]+?)-(?!Article\s+\d)[^\]]+\]\]/gi, "[[$1]]");
   return text;
 }
 
