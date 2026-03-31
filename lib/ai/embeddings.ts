@@ -1,14 +1,14 @@
 /**
  * HuggingFace Inference API wrapper for generating text embeddings.
  *
- * Uses sentence-transformers/all-MiniLM-L6-v2 (384 dimensions).
+ * Uses sentence-transformers/all-mpnet-base-v2 (768 dimensions).
  * This MUST match the model used during ETL to ensure vector compatibility.
  */
 
 const HF_API_URL =
-  "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction";
+  "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-mpnet-base-v2/pipeline/feature-extraction";
 
-const EXPECTED_DIMENSIONS = 384;
+const EXPECTED_DIMENSIONS = 768;
 
 // ---------------------------------------------------------------------------
 // Helpers

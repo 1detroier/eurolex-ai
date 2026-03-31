@@ -41,8 +41,8 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 # Config
 CHUNK_SIZE = 500  # characters
 CHUNK_OVERLAP = 50  # characters
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-EMBEDDING_DIMS = 384
+EMBEDDING_MODEL = "all-mpnet-base-v2"
+EMBEDDING_DIMS = 768
 
 # Regulation metadata
 REGULATIONS = {

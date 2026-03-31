@@ -14,11 +14,10 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Content-Security-Policy': [
     "default-src 'self'",
-    // Next.js needs eval + inline for dev/HMR; prod build hashes these
     "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: https:",
-    // API origins: HuggingFace, Cerebras, Groq, Supabase
     "connect-src 'self' https://router.huggingface.co https://api-inference.huggingface.co https://api.cerebras.ai https://api.groq.com https://*.supabase.co",
   ].join('; '),
 } as const;

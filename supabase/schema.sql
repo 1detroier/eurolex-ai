@@ -5,7 +5,7 @@
 -- PURPOSE:
 --   Creates the vector storage infrastructure for EuroLex AI,
 --   an EU legal document semantic search engine powered by
---   all-MiniLM-L6-v2 embeddings (384 dimensions).
+--   all-mpnet-base-v2 embeddings (768 dimensions).
 --
 -- HOW TO RUN:
 --   1. Open your Supabase project dashboard
@@ -50,7 +50,7 @@ create extension if not exists vector;
 create table if not exists legal_chunks (
     id uuid default gen_random_uuid() primary key,
     content text not null,
-    embedding vector(384) not null,
+    embedding vector(768) not null,
     metadata jsonb not null,
 
     -- Generated columns: auto-extracted from metadata JSON
@@ -116,7 +116,7 @@ create index if not exists idx_legal_chunks_celex_id
 --   id, content, metadata, similarity (float, 0.0–1.0)
 
 create or replace function match_legal_chunks(
-    query_embedding vector(384),
+    query_embedding vector(768),
     match_threshold float,
     match_count int,
     p_regulation text default null
@@ -190,7 +190,7 @@ create policy "deny_all_writes"
 
 -- 4. Test search with a dummy vector (returns 0 rows if table is empty, no error)
 --    SELECT * FROM match_legal_chunks(
---        array_fill(0.1, ARRAY[384])::vector(384),
+--        array_fill(0.1, ARRAY[384])::vector(768),
 --        0.3,
 --        5
 --    );
