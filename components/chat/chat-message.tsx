@@ -54,11 +54,10 @@ function InlineCitationText({
           href={citation.eurlex_url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => {
-            e.preventDefault();
-            console.log("[InlineCite click]", { reg: citation.regulation, art: citation.article, hasContent: !!citation.chunk_content, len: citation.chunk_content?.length });
-            onOpenCitationModal(citation);
-          }}
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenCitationModal(citation);
+            }}
           className="inline-flex items-center gap-0.5 rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20 cursor-pointer border border-primary/20"
           title={article ? `${regulation} — Article ${article}` : regulation}
         >
@@ -66,7 +65,6 @@ function InlineCitationText({
         </a>
       );
     } else {
-      console.log("[InlineCite NO MATCH]", { regulation, article, hasEurlx: !!citation?.eurlex_url, hasContent: !!citation?.chunk_content });
       parts.push(
         <span key={`plain-${match.index}`} className="text-muted-foreground text-xs">
           {regulation}{article ? ` Art. ${article}` : ""}

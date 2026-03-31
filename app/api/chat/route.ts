@@ -215,11 +215,41 @@ export async function POST(request: NextRequest) {
               if (!emittedCitationKeys.has(key)) {
                 emittedCitationKeys.add(key);
 
-                // Build excerpt: first 1000 chars of chunk content
-                const excerpt = citation.chunk_content
-                  ? citation.chunk_content.slice(0, 1000) +
-                    (citation.chunk_content.length > 1000 ? "…" : "")
-                  : "";
+                // Build excerpt: find the cited article in the chunk and trim to sentence boundaries
+                let excerpt = "";
+                if (citation.chunk_content) {
+                  const content = citation.chunk_content;
+                  const articleNum = citation.article.replace("Article ", "");
+
+                  // Try to find the cited article within the chunk
+                  let startIdx = 0;
+                  if (articleNum) {
+                    const articlePattern = new RegExp(`Article\\s+${articleNum}\\b`, "i");
+                    const match = content.match(articlePattern);
+                    if (match && match.index !== undefined) {
+                      // Start from the article heading
+                      startIdx = match.index;
+                    }
+                  }
+
+                  // Extract up to 800 chars from start position
+                  let text = content.slice(startIdx, startIdx + 800);
+
+                  // Trim to sentence boundary (end at . or \n\n)
+                  const lastPeriod = Math.max(
+                    text.lastIndexOf(". "),
+                    text.lastIndexOf(".\n"),
+                    text.lastIndexOf("\n\n")
+                  );
+                  if (lastPeriod > 200) {
+                    text = text.slice(0, lastPeriod + 1);
+                  }
+
+                  // Clean up whitespace
+                  text = text.replace(/\s+/g, " ").trim();
+
+                  excerpt = text + (startIdx + 800 < content.length ? "…" : "");
+                }
 
                 controller.enqueue(
                   encoder.encode(
