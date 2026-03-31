@@ -10,21 +10,14 @@ export const metadata: Metadata = {
   description:
     "AI-powered assistant for European Union legal documents. Get instant answers grounded in EUR-Lex regulations: GDPR, AI Act, DSA, DMA.",
   keywords: [
-    "EU law",
-    "European law",
-    "GDPR",
-    "AI Act",
-    "DSA",
-    "DMA",
-    "EUR-Lex",
-    "legal assistant",
-    "AI",
+    "EU law", "European law", "GDPR", "AI Act", "DSA", "DMA",
+    "EUR-Lex", "legal assistant", "AI",
   ],
   authors: [{ name: "EuroLex AI" }],
   openGraph: {
     title: "EuroLex AI — European Law Assistant",
     description:
-      "AI-powered assistant for European Union legal documents. Get instant answers grounded in EUR-Lex regulations.",
+      "AI-powered assistant for European Union legal documents.",
     type: "website",
   },
 };
@@ -35,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
         className={cn(
           inter.className,

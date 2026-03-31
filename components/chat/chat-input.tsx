@@ -70,7 +70,7 @@ export function ChatInput({
               disabled={disabled}
               placeholder="Ask about EU law (GDPR, AI Act, DSA, DMA)…"
               rows={1}
-              className="max-h-40 min-h-[44px] resize-none rounded-xl border-[hsl(var(--neutral-20))] bg-[hsl(var(--neutral-0))] pr-2 focus-visible:border-[hsl(var(--accent-50)/0.4)] focus-visible:ring-[hsl(var(--accent-50)/0.15)]"
+              className="max-h-40 min-h-[44px] resize-none rounded-xl border-[hsl(var(--neutral-20))] bg-[hsl(var(--neutral-5))] pr-2 focus-visible:border-[hsl(var(--accent-50)/0.4)] focus-visible:ring-[hsl(var(--accent-50)/0.15)]"
               aria-label="Chat message input"
             />
           </div>

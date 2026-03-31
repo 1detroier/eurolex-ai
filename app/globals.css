@@ -5,58 +5,59 @@
 @tailwind utilities;
 
 /* ============================================================
-   FACTORIAL F0 DESIGN SYSTEM
-   Source: https://github.com/factorialco/f0
-   All colors in HSL format (H S% L%)
+   EUROLEX AI — DESIGN SYSTEM
+   Based on Factorial F0 with blue (malibu) accent
+   Supports light + dark mode via class="dark"
    ============================================================ */
 
 @layer base {
+  /* ── LIGHT MODE ── */
   :root {
-    /* ── Neutral scale ── */
+    /* Neutral scale (grey) */
     --neutral-0: 0 0% 100%;
-    --neutral-5: 220 88% 17% / 0.04;
-    --neutral-10: 216 89% 18% / 0.06;
-    --neutral-20: 214 70% 20% / 0.1;
-    --neutral-30: 213 87% 15% / 0.20;
-    --neutral-40: 219 97% 15% / 0.45;
-    --neutral-50: 217 96% 11% / 0.61;
-    --neutral-60: 220 88% 10% / 0.82;
-    --neutral-70: 219 91% 8% / 0.88;
-    --neutral-80: 219 94% 7% / 0.9;
-    --neutral-90: 219 88% 6% / 0.92;
-    --neutral-100: 218 48% 10%;
+    --neutral-5: 220 14% 96%;
+    --neutral-10: 220 13% 93%;
+    --neutral-20: 220 12% 88%;
+    --neutral-30: 220 10% 78%;
+    --neutral-40: 220 8% 60%;
+    --neutral-50: 220 8% 46%;
+    --neutral-60: 220 10% 36%;
+    --neutral-70: 220 12% 28%;
+    --neutral-80: 220 14% 20%;
+    --neutral-90: 220 16% 14%;
+    --neutral-100: 220 20% 8%;
 
-    /* ── Accent (radical = Factorial pink-red) ── */
-    --accent-50: 348 80% 50%;
-    --accent-60: 348 80% 42%;
-    --accent-70: 347 80% 34%;
+    /* Accent (malibu = professional blue) */
+    --accent-50: 216 90% 60%;
+    --accent-60: 216 80% 50%;
+    --accent-70: 216 70% 40%;
 
-    /* ── Semantic ── */
-    --critical-50: 5 100% 65%;
-    --critical-70: 3 71% 41%;
+    /* Semantic */
+    --critical-50: 0 84% 60%;
+    --critical-70: 0 70% 40%;
     --positive-50: 160 84% 39%;
-    --positive-70: 161 84% 27%;
-    --warning-50: 25 95% 53%;
-    --info-50: 216 90% 65%;
-    --info-70: 216 48% 44%;
-    --selected-50: 184 92% 35%;
-    --selected-60: 184 92% 28%;
-    --selected-70: 184 92% 24%;
+    --positive-70: 160 70% 30%;
+    --warning-50: 38 92% 50%;
+    --info-50: 216 90% 60%;
+    --info-70: 216 70% 40%;
+    --selected-50: 216 90% 60%;
+    --selected-60: 216 80% 50%;
+    --selected-70: 216 70% 40%;
 
-    /* ── Ring / Focus ── */
-    --ring: var(--selected-50);
+    /* Ring / Focus */
+    --ring: var(--accent-50);
 
-    /* ── Shadcn semantic tokens (mapped to Factorial) ── */
-    --background: hsl(var(--neutral-0));
-    --foreground: hsl(var(--neutral-100));
-    --card: hsl(var(--neutral-0));
-    --card-foreground: hsl(var(--neutral-100));
-    --popover: hsl(var(--neutral-0));
-    --popover-foreground: hsl(var(--neutral-100));
+    /* Shadcn tokens */
+    --background: 0 0% 100%;
+    --foreground: 220 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
     --primary: hsl(var(--accent-50));
     --primary-foreground: 0 0% 100%;
     --secondary: hsl(var(--neutral-10));
-    --secondary-foreground: hsl(var(--neutral-100));
+    --secondary-foreground: hsl(var(--neutral-90));
     --muted: hsl(var(--neutral-10));
     --muted-foreground: hsl(var(--neutral-50));
     --accent: hsl(var(--accent-50) / 0.08);
@@ -65,60 +66,58 @@
     --destructive-foreground: 0 0% 100%;
     --border: hsl(var(--neutral-20));
     --input: hsl(var(--neutral-20));
-
-    /* ── Border radius (Factorial: 10px default) ── */
     --radius: 0.625rem;
 
-    /* ── Sidebar ── */
-    --sidebar: hsl(var(--neutral-0));
+    /* Sidebar */
+    --sidebar: 220 14% 98%;
     --sidebar-foreground: hsl(var(--neutral-100));
     --sidebar-primary: hsl(var(--accent-50));
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: hsl(var(--neutral-5));
+    --sidebar-accent: hsl(var(--neutral-10));
     --sidebar-accent-foreground: hsl(var(--neutral-100));
     --sidebar-border: hsl(var(--neutral-20));
-    --sidebar-ring: hsl(var(--ring));
+    --sidebar-ring: hsl(var(--accent-50));
   }
 
-  .theme {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
-  }
-
+  /* ── DARK MODE ── */
   .dark {
-    /* ── Dark neutral (inverted) ── */
-    --neutral-0: 218 48% 10%;
-    --neutral-5: 0 0% 100% / 0.05;
-    --neutral-10: 0 0% 100% / 0.1;
-    --neutral-20: 0 0% 100% / 0.2;
-    --neutral-30: 0 0% 100% / 0.3;
-    --neutral-40: 0 0% 100% / 0.4;
-    --neutral-50: 0 0% 100% / 0.5;
-    --neutral-60: 0 0% 100% / 0.6;
-    --neutral-70: 0 0% 100% / 0.7;
-    --neutral-80: 0 0% 100% / 0.8;
-    --neutral-90: 0 0% 100% / 0.9;
-    --neutral-100: 0 0% 100%;
+    --neutral-0: 220 20% 8%;
+    --neutral-5: 220 16% 12%;
+    --neutral-10: 220 14% 16%;
+    --neutral-20: 220 12% 22%;
+    --neutral-30: 220 10% 30%;
+    --neutral-40: 220 8% 42%;
+    --neutral-50: 220 8% 54%;
+    --neutral-60: 220 10% 64%;
+    --neutral-70: 220 12% 74%;
+    --neutral-80: 220 14% 82%;
+    --neutral-90: 220 16% 90%;
+    --neutral-100: 220 20% 96%;
 
-    --background: hsl(var(--neutral-0));
-    --foreground: hsl(var(--neutral-100));
-    --card: 218 48% 12%;
-    --card-foreground: hsl(var(--neutral-100));
-    --popover: 218 48% 12%;
-    --popover-foreground: hsl(var(--neutral-100));
+    --background: 220 20% 8%;
+    --foreground: 220 20% 96%;
+    --card: 220 18% 11%;
+    --card-foreground: 220 20% 96%;
+    --popover: 220 18% 11%;
+    --popover-foreground: 220 20% 96%;
     --primary: hsl(var(--accent-50));
     --primary-foreground: 0 0% 100%;
     --secondary: hsl(var(--neutral-10));
-    --secondary-foreground: hsl(var(--neutral-100));
+    --secondary-foreground: hsl(var(--neutral-90));
     --muted: hsl(var(--neutral-10));
     --muted-foreground: hsl(var(--neutral-50));
     --border: hsl(var(--neutral-20));
     --input: hsl(var(--neutral-20));
 
-    --sidebar: 218 48% 12%;
+    --sidebar: 220 20% 10%;
     --sidebar-foreground: hsl(var(--neutral-100));
     --sidebar-accent: hsl(var(--neutral-10));
     --sidebar-border: hsl(var(--neutral-20));
+  }
+
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: var(--font-sans);
   }
 
   * {
@@ -141,9 +140,7 @@
   }
 }
 
-/* ============================================================
-   FACTORIAL-STYLE UTILITIES
-   ============================================================ */
+/* Scrollbar */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;

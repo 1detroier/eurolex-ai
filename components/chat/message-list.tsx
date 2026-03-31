@@ -57,7 +57,7 @@ export function MessageList({
           {SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion}
-              className="rounded-xl border border-[hsl(var(--neutral-20))] bg-[hsl(var(--neutral-0))] px-3.5 py-3 text-left text-sm text-muted-foreground transition-all hover:border-[hsl(var(--accent-50)/0.3)] hover:bg-[hsl(var(--accent-50)/0.04)] hover:text-foreground"
+              className="rounded-xl border border-[hsl(var(--neutral-20))] bg-[hsl(var(--neutral-5))] px-3.5 py-3 text-left text-sm text-foreground transition-all hover:border-[hsl(var(--accent-50)/0.3)] hover:bg-[hsl(var(--accent-50)/0.04)]"
               onClick={() => {
                 const event = new CustomEvent("eurolex-suggestion", {
                   detail: suggestion,
