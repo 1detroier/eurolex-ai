@@ -81,6 +81,11 @@ export function parseCitations(text: string, chunks: LegalChunk[]): Citation[] {
   while ((match = CITATION_WITH_ARTICLE_REGEX.exec(text)) !== null) {
     const regulationRaw = match[1].trim();
     const articleNumber = match[2];
+
+    // Skip malformed citations with "unknown"
+    if (/unknown/i.test(articleNumber)) continue;
+    if (!/^\d+$/.test(articleNumber)) continue;
+
     const dedupeKey = `${normalizeRegulation(regulationRaw)}:art${articleNumber}`;
 
     if (seen.has(dedupeKey)) continue;

@@ -27,15 +27,20 @@ export function buildSystemPrompt(chunks: LegalChunk[]): string {
 
 RULES:
 1. Answer based ONLY on the provided legal context below. Do not use outside knowledge.
-2. When referencing a regulation, cite it INLINE using this EXACT format: (REGULATION_NAME-Article NUMBER)
-   - CORRECT: (GDPR-Article 5), (AI Act-Article 4), (Digital Services Act-Article 34)
-   - WRONG: [Source: GDPR Article 5], GDPR Article 5, (GDPR-Article Unknown)
-3. Only cite articles where the source label shows a specific article number. If the label says "chunk N" instead of an article number, do NOT cite it as an article — just reference the regulation name without an article number: (GDPR)
-4. Use the EXACT regulation name from the source labels: "GDPR", "AI Act", "Digital Services Act", "Digital Markets Act".
-5. Place citations immediately after the claim they support: "Controllers must implement data protection by design (GDPR-Article 25)."
-6. If the provided context does not contain enough information, say so clearly.
-7. Be precise and factual. Quote relevant passages when appropriate.
-8. Always end with: "This information is for reference only and does not constitute legal advice. Please consult a qualified legal professional for specific legal matters."
+2. To cite a regulation, use ONE of these formats INLINE:
+   - With article number: (GDPR-Article 5), (AI Act-Article 4), (Digital Services Act-Article 34)
+   - Without article number: (GDPR), (AI Act), (Digital Services Act)
+3. ONLY use format with article number when the source label shows a specific number like "Article 5". If the label says "chunk N", use the format WITHOUT article number.
+4. NEVER write "unknown", "Unknown", or "unknown clause" in any citation. This is strictly forbidden.
+5. Use EXACT regulation names: "GDPR", "AI Act", "Digital Services Act", "Digital Markets Act".
+6. Place citations after the claim they support.
+7. If context is insufficient, say so clearly.
+8. Always end with legal disclaimer.
+
+EXAMPLES of correct citations:
+- "Personal data must be processed lawfully (GDPR-Article 5)."
+- "The regulation establishes data protection principles (GDPR)."
+- "High-risk AI systems require conformity assessment (AI Act-Article 43)."
 
 LEGAL CONTEXT:
 ${contextBlock}
