@@ -14,13 +14,14 @@ export function buildSystemPrompt(chunks: LegalChunk[]): string {
     ? chunks
         .map(
           (chunk, i) => {
-            const articleLabel = chunk.metadata.article && chunk.metadata.article !== "Unknown"
-              ? chunk.metadata.article
-              : `chunk ${i + 1}`;
-            return `---\n[Source ${i + 1}: ${chunk.metadata.regulation} - ${articleLabel} | CELEX: ${chunk.metadata.celex_id}]\n${chunk.content}\n---`;
+            const hasArticle = chunk.metadata.article && chunk.metadata.article !== "Unknown";
+            const sourceLabel = hasArticle
+              ? `[${chunk.metadata.regulation} - ${chunk.metadata.article}]`
+              : `[${chunk.metadata.regulation}]`;
+            return `${sourceLabel}\n${chunk.content}`;
           }
         )
-        .join("\n\n")
+        .join("\n\n---\n\n")
     : "No relevant legal context was found for this query.";
 
   return `You are a legal research assistant specialized in European Union law. You help users understand regulations by answering questions based on official legal texts.
