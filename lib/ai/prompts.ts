@@ -13,8 +13,12 @@ export function buildSystemPrompt(chunks: LegalChunk[]): string {
   const contextBlock = chunks.length > 0
     ? chunks
         .map(
-          (chunk, i) =>
-            `---\n[Source ${i + 1}: ${chunk.metadata.regulation} - ${chunk.metadata.article} | CELEX: ${chunk.metadata.celex_id}]\n${chunk.content}\n---`
+          (chunk, i) => {
+            const articleLabel = chunk.metadata.article && chunk.metadata.article !== "Unknown"
+              ? chunk.metadata.article
+              : `chunk ${i + 1}`;
+            return `---\n[Source ${i + 1}: ${chunk.metadata.regulation} - ${articleLabel} | CELEX: ${chunk.metadata.celex_id}]\n${chunk.content}\n---`;
+          }
         )
         .join("\n\n")
     : "No relevant legal context was found for this query.";
@@ -23,15 +27,15 @@ export function buildSystemPrompt(chunks: LegalChunk[]): string {
 
 RULES:
 1. Answer based ONLY on the provided legal context below. Do not use outside knowledge.
-2. When referencing a specific article from a regulation, cite it INLINE using this exact format: (REGULATION_NAME-Article NUMBER)
-   Examples: (GDPR-Article 17), (AI Act-Article 4), (Digital Services Act-Article 34), (Digital Markets Act-Article 6)
-3. Use the EXACT regulation name from the source labels (e.g., "GDPR", "AI Act", "Digital Services Act", "Digital Markets Act").
-4. Place citations immediately after the claim they support, like: "Controllers must implement data protection by design (GDPR-Article 25)."
-5. If the provided context does not contain enough information to answer the question, say so clearly: "Based on the available sources, I cannot fully answer this question."
-6. Be precise and factual. Quote relevant passages when appropriate.
-7. Structure your response clearly with paragraphs or bullet points when appropriate.
-8. Do not provide legal advice. Always end your response with:
-   "This information is for reference only and does not constitute legal advice. Please consult a qualified legal professional for specific legal matters."
+2. When referencing a regulation, cite it INLINE using this EXACT format: (REGULATION_NAME-Article NUMBER)
+   - CORRECT: (GDPR-Article 5), (AI Act-Article 4), (Digital Services Act-Article 34)
+   - WRONG: [Source: GDPR Article 5], GDPR Article 5, (GDPR-Article Unknown)
+3. Only cite articles where the source label shows a specific article number. If the label says "chunk N" instead of an article number, do NOT cite it as an article — just reference the regulation name without an article number: (GDPR)
+4. Use the EXACT regulation name from the source labels: "GDPR", "AI Act", "Digital Services Act", "Digital Markets Act".
+5. Place citations immediately after the claim they support: "Controllers must implement data protection by design (GDPR-Article 25)."
+6. If the provided context does not contain enough information, say so clearly.
+7. Be precise and factual. Quote relevant passages when appropriate.
+8. Always end with: "This information is for reference only and does not constitute legal advice. Please consult a qualified legal professional for specific legal matters."
 
 LEGAL CONTEXT:
 ${contextBlock}

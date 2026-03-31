@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { CitationBadge } from "@/components/chat/citation-badge";
 import type { ChatMessage as ChatMessageType, Citation } from "@/types/legal";
@@ -13,7 +12,9 @@ interface ChatMessageProps {
 
 /**
  * Renders text with inline citations as clickable links.
- * Citation format: (Regulation-Article N) e.g., (GDPR-Article 17)
+ * Supports both formats:
+ *   (GDPR-Article 17) — with article number
+ *   (GDPR)            — regulation only
  */
 function InlineCitationText({
   text,
@@ -24,32 +25,36 @@ function InlineCitationText({
   citations: Citation[];
   onOpenCitationModal: (citation: Citation) => void;
 }) {
-  const citationRegex = /\(([A-Za-z\s]+?)-Article\s+(\d+)\)/gi;
+  // Combined regex: matches both (Reg-Article N) and (Regulation Name)
+  const citationRegex = /\(([A-Za-z][A-Za-z\s]*?)(?:-Article\s+(\d+))?\)/gi;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
   while ((match = citationRegex.exec(text)) !== null) {
-    // Add text before the citation
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
 
     const regulation = match[1].trim();
-    const article = match[2];
+    const article = match[2]; // undefined if no article
     const fullMatch = match[0];
 
     // Find matching citation
-    const citation = citations.find(
-      (c) =>
-        c.regulation.toLowerCase() === regulation.toLowerCase() &&
-        c.article === `Article ${article}`
-    );
+    const citation = article
+      ? citations.find(
+          (c) =>
+            c.regulation.toLowerCase() === regulation.toLowerCase() &&
+            c.article === `Article ${article}`
+        )
+      : citations.find(
+          (c) => c.regulation.toLowerCase() === regulation.toLowerCase()
+        );
 
     if (citation && citation.eurlex_url) {
       parts.push(
         <a
-          key={`${regulation}-${article}-${match.index}`}
+          key={`cite-${match.index}`}
           href={citation.eurlex_url}
           target="_blank"
           rel="noopener noreferrer"
@@ -58,18 +63,14 @@ function InlineCitationText({
             onOpenCitationModal(citation);
           }}
           className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:bg-primary/10 hover:decoration-primary cursor-pointer"
-          title={`${regulation} — Article ${article}`}
+          title={article ? `${regulation} — Article ${article}` : regulation}
         >
           {fullMatch}
         </a>
       );
     } else {
-      // No matching citation found — render as plain text
       parts.push(
-        <span
-          key={`${regulation}-${article}-${match.index}`}
-          className="text-muted-foreground"
-        >
+        <span key={`plain-${match.index}`} className="text-muted-foreground">
           {fullMatch}
         </span>
       );
@@ -78,12 +79,11 @@ function InlineCitationText({
     lastIndex = match.index + fullMatch.length;
   }
 
-  // Add remaining text
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex));
   }
 
-  return <>{parts}</>;
+  return <span className="leading-relaxed">{parts}</span>;
 }
 
 export function ChatMessage({
