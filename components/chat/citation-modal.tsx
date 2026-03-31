@@ -26,6 +26,14 @@ export function CitationModal({
 }: CitationModalProps) {
   if (!citation) return null;
 
+  console.log("[CitationModal]", {
+    regulation: citation.regulation,
+    article: citation.article,
+    hasContent: !!citation.chunk_content,
+    contentLength: citation.chunk_content?.length ?? 0,
+    similarity: citation.similarity,
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col bg-slate-900 border border-slate-700 text-white">

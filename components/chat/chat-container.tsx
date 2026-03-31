@@ -27,6 +27,12 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
   const [citationModalOpen, setCitationModalOpen] = React.useState(false);
 
   const handleOpenCitationModal = React.useCallback((citation: Citation) => {
+    console.log("[handleOpenCitationModal]", {
+      reg: citation.regulation,
+      art: citation.article,
+      hasContent: !!citation.chunk_content,
+      contentLen: citation.chunk_content?.length ?? 0,
+    });
     setSelectedCitation(citation);
     setCitationModalOpen(true);
   }, []);
