@@ -29,7 +29,6 @@ export function ChatInput({
     if (isDisabled) return;
     onSend(value.trim());
     setValue("");
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -51,7 +50,6 @@ export function ChatInput({
       if (newValue.length <= maxLength) {
         setValue(newValue);
       }
-      // Auto-resize
       const textarea = e.target;
       textarea.style.height = "auto";
       textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
@@ -60,25 +58,27 @@ export function ChatInput({
   );
 
   return (
-    <div className="border-t bg-background p-3 sm:p-4">
-      <div className="mx-auto flex max-w-[800px] flex-col gap-2">
+    <div className="border-t border-border bg-background p-3 sm:p-4">
+      <div className="mx-auto flex max-w-[800px] flex-col gap-1.5">
         <div className="flex items-end gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={value}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            placeholder="Ask about EU law (GDPR, AI Act, DSA, DMA)..."
-            rows={1}
-            className="max-h-40 min-h-[44px] resize-none"
-            aria-label="Chat message input"
-          />
+          <div className="relative flex-1">
+            <Textarea
+              ref={textareaRef}
+              value={value}
+              onChange={handleInput}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              placeholder="Ask about EU law (GDPR, AI Act, DSA, DMA)…"
+              rows={1}
+              className="max-h-40 min-h-[44px] resize-none rounded-xl border-[hsl(var(--neutral-20))] bg-[hsl(var(--neutral-0))] pr-2 focus-visible:border-[hsl(var(--accent-50)/0.4)] focus-visible:ring-[hsl(var(--accent-50)/0.15)]"
+              aria-label="Chat message input"
+            />
+          </div>
           <Button
             onClick={handleSubmit}
             disabled={isDisabled}
             size="icon"
-            className="shrink-0"
+            className="shrink-0 rounded-xl bg-[hsl(var(--accent-50))] text-white hover:bg-[hsl(var(--accent-60))] disabled:opacity-40"
             aria-label="Send message"
           >
             <Send className="h-4 w-4" />
@@ -88,7 +88,9 @@ export function ChatInput({
         {isNearLimit && (
           <div
             className={`text-right text-xs ${
-              isOverLimit ? "text-destructive" : "text-muted-foreground"
+              isOverLimit
+                ? "text-[hsl(var(--critical-50))]"
+                : "text-muted-foreground"
             }`}
           >
             {charCount} / {maxLength}
