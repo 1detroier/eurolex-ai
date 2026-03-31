@@ -28,32 +28,25 @@ export function CitationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-slate-900 border border-slate-700 text-white">
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col bg-slate-900 border border-slate-700 text-white">
         <DialogHeader>
-          <DialogTitle className="text-white">
+          <DialogTitle className="text-white text-lg">
             {citation.regulation}
             {citation.article ? ` — ${citation.article}` : " — General Reference"}
           </DialogTitle>
           <DialogDescription className="text-slate-400">
             {citation.similarity > 0
-              ? `Retrieved from EuroLex AI context with ${Math.round(citation.similarity * 100)}% similarity.`
-              : "Referenced in the AI response."}
+              ? `Context match: ${Math.round(citation.similarity * 100)}% similarity`
+              : "Referenced in response"}
+            {citation.celex_id && ` · CELEX: ${citation.celex_id}`}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          {citation.chunk_content && (
-            <div className="rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm leading-relaxed text-slate-300">
-              {citation.chunk_content}
-            </div>
-          )}
-
-          {citation.celex_id && (
-            <p className="text-xs text-slate-500">
-              CELEX: {citation.celex_id}
-            </p>
-          )}
-        </div>
+        {citation.chunk_content && (
+          <div className="flex-1 overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 p-4 text-sm leading-relaxed text-slate-200 min-h-[120px] max-h-[50vh]">
+            <p className="whitespace-pre-wrap">{citation.chunk_content}</p>
+          </div>
+        )}
 
         <DialogFooter>
           {citation.eurlex_url ? (

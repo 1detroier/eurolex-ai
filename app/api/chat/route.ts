@@ -213,10 +213,10 @@ export async function POST(request: NextRequest) {
               if (!emittedCitationKeys.has(key)) {
                 emittedCitationKeys.add(key);
 
-                // Build excerpt: first 150 chars of chunk content
+                // Build excerpt: first 1000 chars of chunk content
                 const excerpt = citation.chunk_content
-                  ? citation.chunk_content.slice(0, 150) +
-                    (citation.chunk_content.length > 150 ? "…" : "")
+                  ? citation.chunk_content.slice(0, 1000) +
+                    (citation.chunk_content.length > 1000 ? "…" : "")
                   : "";
 
                 controller.enqueue(
