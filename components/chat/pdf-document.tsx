@@ -4,8 +4,9 @@ import {
   Text,
   View,
   StyleSheet,
+  Link,
 } from "@react-pdf/renderer";
-import type { ChatMessage } from "@/types/legal";
+import type { ChatMessage, Citation } from "@/types/legal";
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -19,6 +20,8 @@ const COLORS = {
   citationBorder: "#94a3b8",
   muted: "#64748b",
   border: "#e2e8f0",
+  accentBg: "#f8fafc",
+  linkColor: "#2563eb",
 };
 
 const styles = StyleSheet.create({
@@ -32,7 +35,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.5,
   },
 
-  // Header -----------------------------------------------------------------
+  // Header
   header: {
     backgroundColor: COLORS.headerBg,
     borderRadius: 4,
@@ -50,46 +53,101 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
   },
 
-  // Messages ---------------------------------------------------------------
-  messageBlock: {
-    marginBottom: 14,
+  // Report sections
+  sectionTitle: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 12,
+    color: COLORS.headerBg,
+    marginTop: 16,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    borderBottomStyle: "solid",
+    paddingBottom: 4,
   },
-  roleLabel: {
+
+  // Query block (user question)
+  queryBlock: {
+    backgroundColor: COLORS.accentBg,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.labelUser,
+    borderLeftStyle: "solid",
+    padding: 10,
+    marginBottom: 12,
+  },
+  queryLabel: {
     fontFamily: "Helvetica-Bold",
     fontSize: 9,
+    color: COLORS.labelUser,
     marginBottom: 3,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
-  messageContent: {
+  queryText: {
+    fontSize: 10,
+    lineHeight: 1.5,
+  },
+
+  // Answer block
+  answerBlock: {
+    marginBottom: 14,
+  },
+  answerText: {
     fontSize: 10,
     lineHeight: 1.6,
     textAlign: "justify",
   },
 
-  // Citations --------------------------------------------------------------
-  citationsSection: {
-    marginTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    borderTopStyle: "solid",
-    paddingTop: 6,
-  },
-  citationsTitle: {
+  // Inline citation reference
+  citationRef: {
     fontFamily: "Helvetica-Bold",
-    fontSize: 8,
+    fontSize: 9,
+    color: COLORS.linkColor,
+  },
+
+  // Sources section
+  sourcesSection: {
+    marginTop: 12,
+    backgroundColor: COLORS.accentBg,
+    borderRadius: 4,
+    padding: 10,
+  },
+  sourcesTitle: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 9,
     color: COLORS.muted,
     textTransform: "uppercase",
     letterSpacing: 0.4,
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  citationItem: {
+  sourceItem: {
+    marginBottom: 6,
+    paddingLeft: 8,
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.citationBorder,
+    borderLeftStyle: "solid",
+  },
+  sourceRegulation: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 9,
+    color: COLORS.bodyText,
+  },
+  sourceArticle: {
     fontSize: 8,
     color: COLORS.muted,
-    marginBottom: 2,
+  },
+  sourceExcerpt: {
+    fontSize: 8,
+    color: COLORS.muted,
+    marginTop: 2,
+    fontStyle: "italic",
+  },
+  sourceLink: {
+    fontSize: 7,
+    color: COLORS.linkColor,
+    marginTop: 1,
   },
 
-  // Footer -----------------------------------------------------------------
+  // Footer
   footer: {
     position: "absolute",
     bottom: 24,
@@ -106,7 +164,7 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     position: "absolute",
-    bottom: 30,
+    bottom: 38,
     left: 48,
     right: 48,
     fontSize: 7,
@@ -133,6 +191,13 @@ function formatDate(ts: number): string {
   });
 }
 
+/**
+ * Strip citation markers from text for clean display.
+ */
+function stripCitations(text: string): string {
+  return text.replace(/\(([A-Za-z\s]+?)-Article\s+(\d+)\)/g, "").replace(/\s{2,}/g, " ");
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -143,12 +208,26 @@ interface ChatPDFDocumentProps {
 export function ChatPDFDocument({ messages }: ChatPDFDocumentProps) {
   const exportDate = formatDate(Date.now());
 
-  // Collect all unique citations across assistant messages
+  // Extract Q&A pairs (user message → assistant response)
+  const qaPairs: Array<{ question: string; answer: string; citations: Citation[] }> = [];
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].role === "user") {
+      const answer = messages[i + 1]?.role === "assistant" ? messages[i + 1] : null;
+      if (answer) {
+        qaPairs.push({
+          question: messages[i].content,
+          answer: answer.content,
+          citations: answer.citations ?? [],
+        });
+      }
+    }
+  }
+
+  // Collect all unique citations
   const allCitations = messages
     .filter((m) => m.role === "assistant" && m.citations && m.citations.length > 0)
     .flatMap((m) => m.citations!);
 
-  // Deduplicate by regulation:article
   const seen = new Set<string>();
   const uniqueCitations = allCitations.filter((c) => {
     const key = `${c.regulation}:${c.article}`;
@@ -166,38 +245,68 @@ export function ChatPDFDocument({ messages }: ChatPDFDocumentProps) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>EuroLex AI — Legal Research Report</Text>
-          <Text style={styles.headerMeta}>Generated {exportDate}</Text>
+          <Text style={styles.headerMeta}>Generated {exportDate} · {qaPairs.length} queries · {uniqueCitations.length} sources cited</Text>
         </View>
 
-        {/* Messages */}
-        {messages.map((msg, i) => {
-          const isUser = msg.role === "user";
-          const roleLabel = isUser ? "You" : "EuroLex AI";
-          const labelColor = isUser ? COLORS.labelUser : COLORS.labelAssistant;
-
-          return (
-            <View key={`${msg.timestamp}-${i}`} style={styles.messageBlock} wrap>
-              <Text style={[styles.roleLabel, { color: labelColor }]}>
-                {roleLabel}
-              </Text>
-              <Text style={styles.messageContent}>{msg.content}</Text>
-
-              {/* Inline citations per assistant message */}
-              {!isUser && msg.citations && msg.citations.length > 0 && (
-                <View style={styles.citationsSection}>
-                  <Text style={styles.citationsTitle}>Cited Sources</Text>
-                  {msg.citations.map((c) => (
-                    <Text key={c.id} style={styles.citationItem}>
-                      • {c.regulation} — {c.article} (CELEX: {c.celex_id})
-                    </Text>
-                  ))}
-                </View>
-              )}
+        {/* Q&A Sections */}
+        {qaPairs.map((pair, i) => (
+          <View key={i} wrap={false}>
+            {/* Query */}
+            <View style={styles.queryBlock}>
+              <Text style={styles.queryLabel}>Query {i + 1}</Text>
+              <Text style={styles.queryText}>{pair.question}</Text>
             </View>
-          );
-        })}
 
-        {/* Disclaimer (absolute, repeated via fixed position) */}
+            {/* Answer */}
+            <View style={styles.answerBlock}>
+              <Text style={styles.answerText}>{stripCitations(pair.answer)}</Text>
+            </View>
+
+            {/* Sources for this answer */}
+            {pair.citations.length > 0 && (
+              <View style={styles.sourcesSection}>
+                <Text style={styles.sourcesTitle}>Sources</Text>
+                {pair.citations.map((c, j) => (
+                  <View key={j} style={styles.sourceItem}>
+                    <Text style={styles.sourceRegulation}>{c.regulation}</Text>
+                    <Text style={styles.sourceArticle}>{c.article} · CELEX: {c.celex_id}</Text>
+                    {c.chunk_content && (
+                      <Text style={styles.sourceExcerpt}>
+                        {c.chunk_content.length > 200
+                          ? c.chunk_content.slice(0, 200) + "…"
+                          : c.chunk_content}
+                      </Text>
+                    )}
+                    {c.eurlex_url && (
+                      <Link src={c.eurlex_url} style={styles.sourceLink}>
+                        View on EUR-Lex →
+                      </Link>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        ))}
+
+        {/* All Sources Summary */}
+        {uniqueCitations.length > 0 && (
+          <View wrap>
+            <Text style={styles.sectionTitle}>All Cited Sources ({uniqueCitations.length})</Text>
+            {uniqueCitations.map((c, i) => (
+              <View key={i} style={styles.sourceItem}>
+                <Text style={styles.sourceRegulation}>{c.regulation} — {c.article}</Text>
+                {c.eurlex_url && (
+                  <Link src={c.eurlex_url} style={styles.sourceLink}>
+                    {c.eurlex_url}
+                  </Link>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Disclaimer */}
         <Text style={styles.disclaimer}>
           This document is auto-generated by EuroLex AI. It does not constitute legal advice.
           Always verify information against official sources on EUR-Lex (eur-lex.europa.eu).
