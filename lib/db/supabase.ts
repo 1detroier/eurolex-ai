@@ -91,18 +91,24 @@ export async function fetchChunksByRegulations(
 
   const supabase = getSupabase();
 
+  // Build OR filter for each regulation name
+  const orFilter = regulationNames
+    .map((name) => `metadata->>regulation.eq.${name}`)
+    .join(",");
+
   const { data, error } = await supabase
     .from("legal_chunks")
     .select("id, content, metadata")
-    .in("metadata->>regulation", regulationNames)
-    .limit(500); // Safety limit
+    .or(orFilter)
+    .limit(500);
 
   if (error) {
-    throw new Error(`Supabase query error: ${error.message}`);
+    console.error("[supabase] fetchChunksByRegulations error:", error.message);
+    return []; // Non-fatal — citation matching just won't work
   }
 
   return (data ?? []).map((row) => ({
     ...row,
-    similarity: 0, // Not from vector search
+    similarity: 0,
   })) as SearchResult[];
 }
