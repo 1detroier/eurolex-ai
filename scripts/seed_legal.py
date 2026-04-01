@@ -403,12 +403,7 @@ def build_article_chunks(
     articles: list[dict],
     regulation_key: str,
 ) -> list[dict]:
-    """Convert parsed articles into chunks with enriched metadata.
-
-    For each article:
-    - If short enough -> single chunk
-    - If long -> subdivide by sub-paragraphs
-    Each chunk includes parent article context.
+    """Convert parsed articles into chunks — one chunk per article.
 
     Args:
         articles: List from parse_articles().
@@ -419,39 +414,46 @@ def build_article_chunks(
     """
     meta = REGULATIONS[regulation_key]
     chunks = []
-    chunk_index = 0
 
-    for article in articles:
-        sub_articles = subdivide_article(article)
+    for i, article in enumerate(articles):
+        art_num = article["article_number"]
+        art_title = article.get("title", "")
+        body = article["body"]
 
-        for sub in sub_articles:
-            is_sub_paragraph = "_sub_id" in sub
+        # Clean duplicated content (XHTML sometimes repeats paragraphs)
+        lines = body.split("\n")
+        seen = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and stripped not in seen:
+                seen.append(stripped)
+        clean_body = "\n".join(seen)
 
-            # Build content with parent context
-            if is_sub_paragraph:
-                prefix = f"[{meta['name']} - Article {article['article_number']}({sub['_sub_id']}) - {article['title']}]\n\n"
-            else:
-                prefix = f"[{meta['name']} - Article {article['article_number']} - {article['title']}]\n\n"
+        # Truncate very long articles to ~4000 chars
+        if len(clean_body) > 4000:
+            clean_body = clean_body[:4000] + "…"
 
-            content = prefix + sub["body"]
+        # Build chunk with article context prefix
+        article_label = f"Article {art_num}"
+        prefix = f"[{meta['name']} - {article_label}"
+        if art_title:
+            prefix += f" - {art_title}"
+        prefix += "]\n\n"
 
-            chunk_meta = {
-                "regulation": meta["name"],
-                "celex_id": meta["celex_id"],
-                "article": sub.get("_identifier", f"Article {article['article_number']}"),
-                "article_title": article["title"],
-                "unit_type": "sub_paragraph" if is_sub_paragraph else "article",
-                "chunk_index": chunk_index,
-            }
+        content = prefix + clean_body
 
-            # Add content hash for deduplication
-            chunk_meta["content_hash"] = _content_hash(content, chunk_meta)
+        chunk_meta = {
+            "regulation": meta["name"],
+            "celex_id": meta["celex_id"],
+            "article": article_label,
+            "article_title": art_title,
+            "chunk_index": i,
+        }
 
-            chunks.append({
-                "content": content,
-                "metadata": chunk_meta,
-            })
-            chunk_index += 1
+        chunks.append({
+            "content": content,
+            "metadata": chunk_meta,
+        })
 
     return chunks
 
