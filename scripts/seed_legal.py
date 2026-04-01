@@ -1,39 +1,49 @@
 """
-EuroLex AI — Seed Script
+EuroLex AI -- Seed Script
 ========================
-Processes EU regulation texts into chunks with embeddings and inserts
-them into Supabase.
+Fetches EU regulations from EUR-Lex, parses articles, generates embeddings,
+and inserts them into Supabase.
 
 Usage:
     1. Install dependencies: pip install -r scripts/requirements.txt
-    2. Place regulation text files in scripts/data/ (one per regulation)
-    3. Run: python scripts/seed_legal.py
+    2. Run: python scripts/seed_legal.py
+    3. Optional: python scripts/seed_legal.py --dry-run (log without inserting)
+    4. Optional: python scripts/seed_legal.py --regulation gdpr (process one)
 
-Data format (scripts/data/):
-    Each .txt file should contain the regulation text. The script will:
-    - Split into chunks (~500 chars with 50 char overlap)
-    - Generate 384-dim embeddings using all-MiniLM-L6-v2 (local CPU)
-    - Insert into Supabase legal_chunks table
+Pipeline:
+    CELEX ID -> SPARQL metadata -> XHTML fetch -> Article parsing ->
+    Semantic chunking -> Embeddings -> Supabase insert
+
+Fallback:
+    If EUR-Lex fetch fails, reads from scripts/data/{name}.txt
 
 Supported regulations:
     - GDPR (32016R0679)
     - AI Act (52021PC0206)
-    - Digital Services Act (32022D2065)
+    - Digital Services Act (32022R2065)
     - Digital Markets Act (32022R1925)
+    - NIS2 Directive (32022L2555)
+    - Cyber Resilience Act (32024R2847)
 """
 
 import os
 import re
 import json
 import hashlib
+import time
+import logging
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import requests
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from supabase import create_client
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 # Load .env from project root
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -66,7 +76,422 @@ REGULATIONS = {
         "celex_id": "32022R1925",
         "description": "Digital Markets Act",
     },
+    "nis2": {
+        "name": "NIS2 Directive",
+        "celex_id": "32022L2555",
+        "description": "Network and Information Security Directive 2",
+    },
+    "cra": {
+        "name": "Cyber Resilience Act",
+        "celex_id": "32024R2847",
+        "description": "Cyber Resilience Act",
+    },
 }
+
+# --- EUR-Lex Client Constants ------------------------------------------
+SPARQL_ENDPOINT = "https://publications.europa.eu/webapi/rdf/sparql"
+RATE_LIMIT_DELAY = 0.5  # seconds between requests
+MAX_RETRIES = 3
+RETRY_BACKOFF = 2  # exponential base
+
+
+class EURLexError(Exception):
+    """Custom exception for EUR-Lex API errors."""
+    pass
+
+
+# --- EUR-Lex Client Functions ------------------------------------------
+
+def _rate_limit():
+    """Enforce minimum delay between API requests."""
+    time.sleep(RATE_LIMIT_DELAY)
+
+
+def sparql_query(celex_id: str) -> dict:
+    """Run SPARQL query to get document metadata and manifestation URIs.
+
+    Queries the CELLAR SPARQL endpoint for work/expression/manifestation
+    triples filtered by CELEX ID and English language.
+
+    Args:
+        celex_id: The CELEX identifier (e.g., "32016R0679" for GDPR).
+
+    Returns:
+        Dict with keys: work_uri, expression_uri, manifestation_uri, doc_type.
+
+    Raises:
+        EURLexError: If SPARQL query fails or returns no results.
+    """
+    query = f"""
+    PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    SELECT ?work ?expression ?manifestation ?type WHERE {{
+      ?work cdm:resource_legal_id_celex ?celex .
+      FILTER(?celex = "{celex_id}"^^xsd:string) .
+      ?expression cdm:expression_belongs_to_work ?work .
+      ?expression cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/ENG> .
+      ?manifestation cdm:manifestation_manifests_expression ?expression .
+      ?manifestation cdm:manifestation_type ?type .
+    }}
+    LIMIT 10
+    """
+
+    _rate_limit()
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.post(
+                SPARQL_ENDPOINT,
+                data={"query": query},
+                headers={
+                    "Accept": "application/sparql-results+json",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+
+            data = resp.json()
+            results = data.get("results", {}).get("bindings", [])
+
+            if not results:
+                raise EURLexError(
+                    f"SPARQL returned no results for CELEX {celex_id}"
+                )
+
+            # Extract URIs -- prefer XHTML manifestation type
+            xhtml_binding = None
+            for b in results:
+                if b.get("type", {}).get("value") == "xhtml":
+                    xhtml_binding = b
+                    break
+            binding = xhtml_binding or results[0]
+
+            return {
+                "work_uri": binding.get("work", {}).get("value", ""),
+                "expression_uri": binding.get("expression", {}).get("value", ""),
+                "manifestation_uri": binding.get("manifestation", {}).get("value", ""),
+                "doc_type": binding.get("type", {}).get("value", ""),
+            }
+
+        except requests.RequestException as e:
+            wait = RETRY_BACKOFF ** attempt
+            logger.warning(
+                f"SPARQL attempt {attempt + 1}/{MAX_RETRIES} failed for "
+                f"{celex_id}: {e}. Retrying in {wait}s..."
+            )
+            time.sleep(wait)
+
+    raise EURLexError(
+        f"SPARQL query failed after {MAX_RETRIES} retries for CELEX {celex_id}"
+    )
+
+
+def fetch_xhtml(manifestation_uri: str) -> str:
+    """Fetch XHTML content via content negotiation.
+
+    Uses Accept: application/xhtml+xml to get clean XHTML from the
+    CELLAR manifestation URI.
+
+    Args:
+        manifestation_uri: Full URI from SPARQL query.
+
+    Returns:
+        XHTML string (complete document).
+
+    Raises:
+        EURLexError: If fetch fails after retries.
+    """
+    _rate_limit()
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(
+                manifestation_uri,
+                headers={"Accept": "application/xhtml+xml"},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            return resp.text
+
+        except requests.RequestException as e:
+            wait = RETRY_BACKOFF ** attempt
+            logger.warning(
+                f"XHTML fetch attempt {attempt + 1}/{MAX_RETRIES} failed: "
+                f"{e}. Retrying in {wait}s..."
+            )
+            time.sleep(wait)
+
+    raise EURLexError(
+        f"Failed to fetch XHTML after {MAX_RETRIES} retries: {manifestation_uri}"
+    )
+
+
+def parse_articles(xhtml: str) -> list[dict]:
+    """Extract articles from XHTML content.
+
+    Looks for <div id="art_N"> patterns (EUR-Lex standard structure).
+    Extracts article number, title, and body text.
+    Falls back to full-text extraction if no article divs found.
+
+    Args:
+        xhtml: Raw XHTML string.
+
+    Returns:
+        List of dicts with keys: article_number, title, body, sub_paragraphs.
+    """
+    soup = BeautifulSoup(xhtml, "lxml-xml")
+    articles = []
+
+    # Try standard EUR-Lex article divs: <div id="art_1">, <div id="art_2">, etc.
+    # Use $ anchor to exclude sub-elements like art_1.tit_1
+    art_divs = soup.find_all("div", id=re.compile(r"^art_\d+$"))
+
+    if art_divs:
+        for div in art_divs:
+            article_num = str(div.get("id", "")).replace("art_", "")
+
+            # Extract title: look for <p class="title"> or <h2> or <p class="sti-art">
+            title_tag = (
+                div.find("p", class_="title")
+                or div.find("h2")
+                or div.find("p", class_=re.compile(r"sti-art"))
+            )
+            title = title_tag.get_text(strip=True) if title_tag else f"Article {article_num}"
+
+            # Extract body text (strip tags but preserve structure)
+            body_parts = []
+            sub_paragraphs = []
+
+            for child in div.find_all(["p", "div"], recursive=True):
+                text = child.get_text(separator=" ", strip=True)
+                if text and len(text) > 5:
+                    # Check for sub-paragraph markers: (a), (b), 1., 2.
+                    sp_match = re.match(r"^\(?([a-z]|\d+)[\.\)]\s*", text)
+                    if sp_match:
+                        sub_paragraphs.append({
+                            "id": sp_match.group(1),
+                            "text": text,
+                        })
+                    body_parts.append(text)
+
+            body = "\n".join(body_parts)
+
+            articles.append({
+                "article_number": int(article_num) if article_num.isdigit() else 0,
+                "title": title,
+                "body": body,
+                "sub_paragraphs": sub_paragraphs,
+            })
+
+        logger.info(f"Parsed {len(articles)} articles from XHTML")
+        return articles
+
+    # Fallback: no art_N divs found -- extract full text
+    logger.warning(
+        "No <div id='art_N'> found in XHTML. "
+        "Falling back to full-text extraction."
+    )
+
+    # Strip all tags, get clean text
+    full_text = soup.get_text(separator="\n", strip=True)
+
+    # Try to split by "Article N" pattern in text
+    article_splits = re.split(r"(Article\s+\d+)", full_text)
+
+    if len(article_splits) > 1:
+        # Recombine title + body pairs
+        for i in range(1, len(article_splits), 2):
+            title = article_splits[i].strip()
+            body = article_splits[i + 1].strip() if i + 1 < len(article_splits) else ""
+            num_match = re.search(r"\d+", title)
+            articles.append({
+                "article_number": int(num_match.group()) if num_match else 0,
+                "title": title,
+                "body": body,
+                "sub_paragraphs": [],
+            })
+
+        logger.info(f"Fallback parsed {len(articles)} articles by text splitting")
+        return articles
+
+    # Last resort: return entire text as single chunk
+    logger.warning("Could not split into articles. Returning full text as single chunk.")
+    return [{
+        "article_number": 0,
+        "title": "Full Document",
+        "body": full_text,
+        "sub_paragraphs": [],
+    }]
+
+
+# --- Semantic Chunking (Phase 2) --------------------------------------
+
+MAX_ARTICLE_CHARS = 3200  # ~800 tokens, threshold for subdivision
+SUB_PARAGRAPH_PATTERN = re.compile(
+    r"(?=\n?\s*(?:\(([a-z])\)|(\d+)\.\s|[IVXLC]+\.\s))"
+)
+
+
+def subdivide_article(article: dict, max_chars: int = MAX_ARTICLE_CHARS) -> list[dict]:
+    """Split long articles by sub-paragraphs.
+
+    If article body <= max_chars, returns it as-is.
+    Otherwise splits by (a), (b), (c) or 1., 2., 3. patterns.
+
+    Each sub-chunk gets an identifier like "Article 5(a)", "Article 5(b)".
+
+    Args:
+        article: Dict with article_number, title, body, sub_paragraphs.
+        max_chars: Maximum characters before subdivision triggers.
+
+    Returns:
+        List of article dicts (may be 1 if short enough).
+    """
+    body = article["body"]
+
+    if len(body) <= max_chars:
+        return [article]
+
+    # Split body by sub-paragraph markers
+    # Pattern: (a), (b), ... or 1., 2., ... at line start
+    parts = re.split(
+        r"\n\s*(?=\([a-z]\)\s|\d+\.\s|[IVXLC]+\.\s)",
+        body,
+    )
+
+    # Filter out empty/very short parts
+    parts = [p.strip() for p in parts if len(p.strip()) > 10]
+
+    if len(parts) <= 1:
+        # Couldn't split meaningfully, return original
+        return [article]
+
+    sub_articles = []
+    for i, part in enumerate(parts):
+        # Extract the sub-paragraph marker if present
+        marker_match = re.match(r"^\(?([a-z]|\d+|[IVXLC]+)\)?[\.\)]\s*", part)
+        sub_id = marker_match.group(1) if marker_match else str(i + 1)
+
+        # Build identifier: "Article 5(a)" or "Article 5(1)"
+        art_num = article["article_number"]
+        identifier = f"Article {art_num}({sub_id})" if art_num else f"Sub-paragraph ({sub_id})"
+
+        sub_articles.append({
+            "article_number": art_num,
+            "title": article["title"],
+            "body": part,
+            "sub_paragraphs": [],
+            "_sub_id": sub_id,
+            "_identifier": identifier,
+        })
+
+    return sub_articles
+
+
+def _content_hash(content: str, metadata: dict) -> str:
+    """Generate SHA-256 hash for deduplication.
+
+    Hashes normalized content + key metadata fields.
+    """
+    normalized = " ".join(content.split()).lower()
+    key = f"{metadata.get('celex_id', '')}:{metadata.get('article', '')}:{normalized}"
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def build_article_chunks(
+    articles: list[dict],
+    regulation_key: str,
+) -> list[dict]:
+    """Convert parsed articles into chunks with enriched metadata.
+
+    For each article:
+    - If short enough -> single chunk
+    - If long -> subdivide by sub-paragraphs
+    Each chunk includes parent article context.
+
+    Args:
+        articles: List from parse_articles().
+        regulation_key: Key in REGULATIONS dict.
+
+    Returns:
+        List of {content, metadata} dicts ready for embedding.
+    """
+    meta = REGULATIONS[regulation_key]
+    chunks = []
+    chunk_index = 0
+
+    for article in articles:
+        sub_articles = subdivide_article(article)
+
+        for sub in sub_articles:
+            is_sub_paragraph = "_sub_id" in sub
+
+            # Build content with parent context
+            if is_sub_paragraph:
+                prefix = f"[{meta['name']} - Article {article['article_number']}({sub['_sub_id']}) - {article['title']}]\n\n"
+            else:
+                prefix = f"[{meta['name']} - Article {article['article_number']} - {article['title']}]\n\n"
+
+            content = prefix + sub["body"]
+
+            chunk_meta = {
+                "regulation": meta["name"],
+                "celex_id": meta["celex_id"],
+                "article": sub.get("_identifier", f"Article {article['article_number']}"),
+                "article_title": article["title"],
+                "unit_type": "sub_paragraph" if is_sub_paragraph else "article",
+                "chunk_index": chunk_index,
+            }
+
+            # Add content hash for deduplication
+            chunk_meta["content_hash"] = _content_hash(content, chunk_meta)
+
+            chunks.append({
+                "content": content,
+                "metadata": chunk_meta,
+            })
+            chunk_index += 1
+
+    return chunks
+
+
+def fetch_regulation_xhtml(celex_id: str, lang: str = "ENG") -> str:
+    """Fetch XHTML for a regulation from EUR-Lex.
+
+    Strategy:
+    1. SPARQL query to get manifestation URI
+    2. Content negotiation to fetch XHTML
+    3. If SPARQL fails, try direct content negotiation on EUR-Lex
+
+    Args:
+        celex_id: CELEX identifier (e.g., "32016R0679").
+        lang: Language code (default: "ENG").
+
+    Returns:
+        XHTML string.
+    """
+    try:
+        sparql_result = sparql_query(celex_id)
+        manifestation_uri = sparql_result["manifestation_uri"]
+        logger.info(f"SPARQL returned manifestation: {manifestation_uri}")
+        return fetch_xhtml(manifestation_uri)
+
+    except EURLexError as e:
+        logger.warning(f"SPARQL path failed: {e}. Trying direct content negotiation...")
+
+    # Fallback: direct content negotiation on EUR-Lex
+    # Pattern: http://publications.europa.eu/resource/celex/{celex_id}?lang=eng
+    fallback_url = f"http://publications.europa.eu/resource/celex/{celex_id}?lang={lang.lower()}"
+    logger.info(f"Fallback URL: {fallback_url}")
+
+    try:
+        return fetch_xhtml(fallback_url)
+    except EURLexError:
+        raise EURLexError(
+            f"All fetch strategies failed for CELEX {celex_id}. "
+            f"SPARQL and direct content negotiation both failed."
+        )
 
 
 def extract_article(text: str, position: int) -> Optional[str]:
@@ -114,31 +539,67 @@ def chunk_text(text: str, regulation_key: str) -> list[dict]:
     return chunks
 
 
-def process_regulation(file_path: Path, model: SentenceTransformer) -> list[dict]:
-    """Process a single regulation file into chunks with embeddings."""
-    reg_key = file_path.stem.lower()
+def process_regulation_from_xhtml(
+    xhtml: str,
+    regulation_key: str,
+    model: SentenceTransformer,
+) -> list[dict]:
+    """Process XHTML into chunks with embeddings (EUR-Lex pipeline).
 
-    if reg_key not in REGULATIONS:
-        print(f"  WARNING: Unknown regulation '{reg_key}', skipping")
+    Args:
+        xhtml: Raw XHTML from EUR-Lex.
+        regulation_key: Key in REGULATIONS dict.
+        model: SentenceTransformer model for embeddings.
+
+    Returns:
+        List of chunks with embeddings attached.
+    """
+    meta = REGULATIONS[regulation_key]
+    print(f"\n  Parsing articles from XHTML...")
+    articles = parse_articles(xhtml)
+    print(f"  Found {len(articles)} articles")
+
+    print(f"  Building semantic chunks...")
+    chunks = build_article_chunks(articles, regulation_key)
+    print(f"  Generated {len(chunks)} chunks")
+
+    if not chunks:
         return []
 
-    print(f"\nProcessing: {REGULATIONS[reg_key]['name']} ({file_path.name})")
+    # Generate embeddings
+    print(f"  Generating embeddings ({len(chunks)} texts)...")
+    texts = [c["content"] for c in chunks]
+    embeddings = model.encode(texts, show_progress_bar=True, batch_size=32)
 
+    for chunk, emb in zip(chunks, embeddings):
+        chunk["embedding"] = emb.tolist()
+
+    return chunks
+
+
+def process_regulation_from_file(
+    file_path: Path,
+    regulation_key: str,
+    model: SentenceTransformer,
+) -> list[dict]:
+    """Fallback: process .txt file with old character-based chunking.
+
+    Used when EUR-Lex fetch fails.
+    """
+    print(f"\n  Reading from file: {file_path.name}")
     text = file_path.read_text(encoding="utf-8")
     print(f"  Text length: {len(text):,} chars")
 
-    chunks = chunk_text(text, reg_key)
+    chunks = chunk_text(text, regulation_key)
     print(f"  Chunks: {len(chunks)}")
 
     if not chunks:
         return []
 
-    # Generate embeddings (batch for efficiency)
     print(f"  Generating embeddings...")
     texts = [c["content"] for c in chunks]
     embeddings = model.encode(texts, show_progress_bar=True, batch_size=32)
 
-    # Attach embeddings to chunks
     for chunk, emb in zip(chunks, embeddings):
         chunk["embedding"] = emb.tolist()
 
@@ -182,47 +643,128 @@ def insert_into_supabase(chunks: list[dict]) -> int:
 
 
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Seed EU regulation chunks into Supabase via EUR-Lex pipeline."
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Log chunks without inserting to Supabase.",
+    )
+    parser.add_argument(
+        "--regulation",
+        type=str,
+        default=None,
+        help="Process only one regulation (e.g., 'gdpr', 'ai-act').",
+    )
+    args = parser.parse_args()
+
     data_dir = Path(__file__).parent / "data"
 
-    if not data_dir.exists():
-        print(f"Creating {data_dir}/ directory...")
-        data_dir.mkdir(parents=True)
-        print(f"\nPlease place regulation text files in {data_dir}/")
-        print("Supported files:")
-        for key, meta in REGULATIONS.items():
-            print(f"  {key}.txt — {meta['description']} ({meta['celex_id']})")
-        return
+    # Determine which regulations to process
+    if args.regulation:
+        if args.regulation not in REGULATIONS:
+            print(f"ERROR: Unknown regulation '{args.regulation}'")
+            print(f"Available: {', '.join(REGULATIONS.keys())}")
+            return
+        regulations_to_process = {args.regulation: REGULATIONS[args.regulation]}
+    else:
+        regulations_to_process = REGULATIONS
 
-    # Find regulation files
-    files = list(data_dir.glob("*.txt"))
-    if not files:
-        print(f"No .txt files found in {data_dir}/")
-        return
-
-    print(f"Found {len(files)} regulation file(s)")
+    print(f"\n{'='*60}")
+    print(f"  EuroLex AI -- Seed Pipeline")
+    print(f"  Regulations: {len(regulations_to_process)}")
+    print(f"  Mode: {'DRY RUN' if args.dry_run else 'LIVE INSERT'}")
+    print(f"{'='*60}")
 
     # Load embedding model
     print(f"\nLoading embedding model: {EMBEDDING_MODEL}")
     model = SentenceTransformer(EMBEDDING_MODEL)
     print(f"  Model loaded ({EMBEDDING_DIMS} dimensions)")
 
-    # Process all regulations
+    # Process each regulation
     all_chunks = []
-    for file_path in sorted(files):
-        chunks = process_regulation(file_path, model)
-        all_chunks.extend(chunks)
+    stats = {"success": 0, "fallback": 0, "failed": 0}
+
+    for reg_key, meta in regulations_to_process.items():
+        celex_id = meta["celex_id"]
+        print(f"\n{'-'*60}")
+        print(f"  [{meta['name']}] CELEX: {celex_id}")
+        print(f"{'-'*60}")
+
+        chunks = []
+
+        # Try EUR-Lex pipeline first
+        try:
+            print(f"  Fetching XHTML from EUR-Lex...")
+            xhtml = fetch_regulation_xhtml(celex_id)
+            print(f"  XHTML fetched ({len(xhtml):,} chars)")
+            chunks = process_regulation_from_xhtml(xhtml, reg_key, model)
+            stats["success"] += 1
+        except EURLexError as e:
+            print(f"  EUR-Lex fetch FAILED: {e}")
+            print(f"  Trying .txt file fallback...")
+
+            # Fallback to .txt file
+            txt_file = data_dir / f"{reg_key}.txt"
+            if txt_file.exists():
+                chunks = process_regulation_from_file(txt_file, reg_key, model)
+                stats["fallback"] += 1
+            else:
+                print(f"  No fallback file found: {txt_file}")
+                stats["failed"] += 1
+                continue
+
+        if chunks:
+            print(f"  Result: {len(chunks)} chunks ready")
+            all_chunks.extend(chunks)
+        else:
+            print(f"  WARNING: No chunks generated for {meta['name']}")
+            stats["failed"] += 1
 
     if not all_chunks:
-        print("\nNo chunks generated. Check your input files.")
+        print(f"\n{'='*60}")
+        print("  No chunks generated for any regulation. Check logs.")
+        print(f"{'='*60}")
         return
 
-    print(f"\n{'='*50}")
-    print(f"Total chunks: {len(all_chunks)}")
-    print(f"{'='*50}")
+    # Summary
+    print(f"\n{'='*60}")
+    print(f"  Pipeline Summary")
+    print(f"{'='*60}")
+    print(f"  Total chunks: {len(all_chunks)}")
+    print(f"  EUR-Lex direct: {stats['success']}")
+    print(f"  File fallback:  {stats['fallback']}")
+    print(f"  Failed:         {stats['failed']}")
+
+    # Deduplicate by content hash
+    seen_hashes = set()
+    unique_chunks = []
+    for chunk in all_chunks:
+        h = chunk["metadata"].get("content_hash", "")
+        if h and h in seen_hashes:
+            continue
+        seen_hashes.add(h)
+        unique_chunks.append(chunk)
+
+    if len(unique_chunks) < len(all_chunks):
+        print(f"  Deduplicated: {len(all_chunks)} -> {len(unique_chunks)} chunks")
+    all_chunks = unique_chunks
+
+    if args.dry_run:
+        print(f"\n  DRY RUN -- Not inserting to Supabase.")
+        print(f"\n  Sample chunks:")
+        for chunk in all_chunks[:5]:
+            m = chunk["metadata"]
+            print(f"    [{m['article']}] ({m['unit_type']}) {chunk['content'][:80]}...")
+        print(f"\n  Total unique chunks that would be inserted: {len(all_chunks)}")
+        return
 
     # Insert into Supabase
     inserted = insert_into_supabase(all_chunks)
-    print(f"\n✅ Done! Inserted {inserted} chunks into Supabase")
+    print(f"\n  Done! Inserted {inserted} chunks into Supabase")
 
 
 if __name__ == "__main__":

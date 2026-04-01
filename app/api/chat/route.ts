@@ -56,7 +56,7 @@ const SSE_HEADERS: Record<string, string> = {
  * Valid: [[GDPR]], [[GDPR-Article 5]], [[AI Act-Article 4]]
  * Invalid: [[GDPR-d]], [[GDPR-unknown]], [[foo]]
  */
-const KNOWN_REGULATIONS = ["gdpr", "ai act", "digital services act", "digital markets act"];
+const KNOWN_REGULATIONS = ["gdpr", "ai act", "digital services act", "digital markets act", "nis2 directive", "cyber resilience act"];
 
 function cleanMalformedCitations(text: string): string {
   // Remove [[...]] with single-letter "articles" like [[GDPR-d]] or [[GDPR-(d)]]

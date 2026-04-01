@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   Shield,
+  ShieldCheck,
   Cpu,
   Globe,
   Building2,
@@ -11,6 +12,7 @@ import {
   Scale,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +22,7 @@ import { cn } from "@/lib/utils";
 interface Regulation {
   name: string;
   celexId: string;
+  type: "regulation" | "directive";
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -27,22 +30,38 @@ const REGULATIONS: Regulation[] = [
   {
     name: "GDPR",
     celexId: "32016R0679",
+    type: "regulation",
     icon: Shield,
   },
   {
     name: "AI Act",
     celexId: "52021PC0206",
+    type: "regulation",
     icon: Cpu,
   },
   {
     name: "Digital Services Act",
     celexId: "32022R2065",
+    type: "regulation",
     icon: Globe,
   },
   {
     name: "Digital Markets Act",
     celexId: "32022R1925",
+    type: "regulation",
     icon: Building2,
+  },
+  {
+    name: "NIS2 Directive",
+    celexId: "32022L2555",
+    type: "directive",
+    icon: Shield,
+  },
+  {
+    name: "Cyber Resilience Act",
+    celexId: "32024R2847",
+    type: "regulation",
+    icon: ShieldCheck,
   },
 ];
 
@@ -171,7 +190,15 @@ export function Sidebar({
                   )}
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="font-medium truncate">{reg.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium truncate">{reg.name}</span>
+                    <Badge
+                      variant={reg.type === "regulation" ? "info" : "accent"}
+                      className="shrink-0 text-[10px] px-1.5 py-0"
+                    >
+                      {reg.type === "regulation" ? "R" : "D"}
+                    </Badge>
+                  </div>
                   <span className="text-xs text-muted-foreground">
                     {reg.celexId}
                   </span>

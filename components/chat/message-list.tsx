@@ -17,6 +17,7 @@ const SUGGESTIONS = [
   "Explain the AI Act's risk classification system.",
   "What are the DSA obligations for very large platforms?",
   "How does the DMA regulate gatekeepers?",
+  "What are the NIS2 incident reporting requirements?",
 ];
 
 export function MessageList({
@@ -49,7 +50,7 @@ export function MessageList({
             How can I help?
           </h2>
           <p className="max-w-md text-sm text-muted-foreground">
-            Ask about EU regulations — GDPR, AI Act, DSA, DMA.
+            Ask about EU regulations — GDPR, AI Act, DSA, DMA, NIS2, CRA.
           </p>
         </div>
 
