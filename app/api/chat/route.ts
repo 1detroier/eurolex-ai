@@ -149,17 +149,20 @@ export async function POST(request: NextRequest) {
     console.log(`[chat] Search returned ${chunks.length} chunks`);
 
     // Fetch ALL chunks for matching regulations (for citation parser)
-    const uniqueRegs = Array.from(new Set(chunks.map((c) => c.metadata.regulation)));
-    if (uniqueRegs.length > 0) {
-      const allRegChunks = await fetchChunksByRegulations(uniqueRegs);
-      // Merge: search results first (for prompt), then all reg chunks (for citations)
-      const seen = new Set(chunks.map((c) => c.id));
-      for (const rc of allRegChunks) {
-        if (!seen.has(rc.id)) {
-          chunks.push(rc as LegalChunk);
+    try {
+      const uniqueRegs = Array.from(new Set(chunks.map((c) => c.metadata.regulation)));
+      if (uniqueRegs.length > 0) {
+        const allRegChunks = await fetchChunksByRegulations(uniqueRegs);
+        const seen = new Set(chunks.map((c) => c.id));
+        for (const rc of allRegChunks) {
+          if (!seen.has(rc.id)) {
+            chunks.push(rc as LegalChunk);
+          }
         }
+        console.log(`[chat] Total chunks (search + regulation): ${chunks.length}`);
       }
-      console.log(`[chat] Total chunks (search + regulation): ${chunks.length}`);
+    } catch (fetchErr) {
+      console.error("[chat] fetchChunksByRegulations failed (non-fatal):", fetchErr);
     }
   } catch (error) {
     // Supabase failure is non-fatal — the LLM can still answer general questions

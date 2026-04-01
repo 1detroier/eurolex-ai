@@ -90,25 +90,22 @@ export async function fetchChunksByRegulations(
   if (regulationNames.length === 0) return [];
 
   const supabase = getSupabase();
+  const allData: SearchResult[] = [];
 
-  // Build OR filter for each regulation name
-  const orFilter = regulationNames
-    .map((name) => `metadata->>regulation.eq.${name}`)
-    .join(",");
+  // Query each regulation separately (simpler, more reliable)
+  for (const name of regulationNames) {
+    const { data, error } = await supabase
+      .from("legal_chunks")
+      .select("id, content, metadata")
+      .eq("metadata->>regulation", name)
+      .limit(200);
 
-  const { data, error } = await supabase
-    .from("legal_chunks")
-    .select("id, content, metadata")
-    .or(orFilter)
-    .limit(500);
-
-  if (error) {
-    console.error("[supabase] fetchChunksByRegulations error:", error.message);
-    return []; // Non-fatal — citation matching just won't work
+    if (!error && data) {
+      for (const row of data) {
+        allData.push({ ...row, similarity: 0 } as SearchResult);
+      }
+    }
   }
 
-  return (data ?? []).map((row) => ({
-    ...row,
-    similarity: 0,
-  })) as SearchResult[];
+  return allData;
 }
