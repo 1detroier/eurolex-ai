@@ -21,20 +21,20 @@ interface ProviderConfig {
 
 const PROVIDERS: ProviderConfig[] = [
   {
+    name: "groq",
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    apiKeyEnv: "GROQ_API_KEY",
+    model: "llama-3.3-70b-versatile",
+  },
+  {
     name: "cerebras",
     url: "https://api.cerebras.ai/v1/chat/completions",
     apiKeyEnv: "CEREBRAS_API_KEY",
     model: "llama3.1-8b",
   },
-  {
-    name: "groq",
-    url: "https://api.groq.com/openai/v1/chat/completions",
-    apiKeyEnv: "GROQ_API_KEY",
-    model: "llama-3.1-8b-instant",
-  },
 ];
 
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // SSE parsing
