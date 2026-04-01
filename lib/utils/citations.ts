@@ -10,8 +10,8 @@ import type { Citation, LegalChunk } from "@/types/legal";
 // Regex patterns
 // ---------------------------------------------------------------------------
 
-/** Matches [[Regulation - Article N]] with optional sub-paragraphs like 5(1), 5(a) */
-const CITATION_WITH_ARTICLE_REGEX = /\[\[([A-Za-z\s]+?)\s*-\s*Article\s+(\d+(?:\(\d+\))?(?:\([a-z]\))?)\]\]/gi;
+/** Matches [[Regulation - Article N]] with sub-paragraphs: 5, 5(1), 5(a), 5-1, 5-1(a) */
+const CITATION_WITH_ARTICLE_REGEX = /\[\[([A-Za-z\s]+?)\s*-\s*Article\s+(\d+(?:[\(\-][\da-z]+[\)]?){0,3})\]\]/gi;
 
 /** Matches [[Regulation]] (no article) */
 const CITATION_NO_ARTICLE_REGEX = /\[\[([A-Za-z][A-Za-z\s]+?)\]\]/g;
