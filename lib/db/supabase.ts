@@ -73,3 +73,36 @@ export async function matchLegalChunks(
   // The RPC returns rows directly — cast to our typed result
   return (data ?? []) as SearchResult[];
 }
+
+/**
+ * Fetch all chunks for given regulation names (for citation matching).
+ *
+ * The vector search only returns top-N results, but the LLM might cite
+ * articles outside those results. This fetches all chunks for the
+ * relevant regulations so the citation parser can find matches.
+ *
+ * @param regulationNames - e.g. ["GDPR", "NIS2 Directive"]
+ * @returns All chunks for those regulations (metadata + content only)
+ */
+export async function fetchChunksByRegulations(
+  regulationNames: string[]
+): Promise<SearchResult[]> {
+  if (regulationNames.length === 0) return [];
+
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from("legal_chunks")
+    .select("id, content, metadata")
+    .in("metadata->>regulation", regulationNames)
+    .limit(500); // Safety limit
+
+  if (error) {
+    throw new Error(`Supabase query error: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => ({
+    ...row,
+    similarity: 0, // Not from vector search
+  })) as SearchResult[];
+}
