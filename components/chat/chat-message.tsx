@@ -23,7 +23,7 @@ function InlineCitationText({
   citations: Citation[];
   onOpenCitationModal: (citation: Citation) => void;
 }) {
-  const citationRegex = /\[\[([A-Za-z][A-Za-z\s]+?)\s*[-–]\s*Article\s+([^\]]+)\]\]/g;
+  const citationRegex = /\[\[([A-Za-z0-9][A-Za-z0-9\s]+?)\s*[-–]\s*Article\s+([^\]]+)\]\]|\[\[([A-Za-z0-9][A-Za-z0-9\s]+?)\]\]/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;

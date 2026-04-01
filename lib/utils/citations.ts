@@ -11,10 +11,10 @@ import type { Citation, LegalChunk } from "@/types/legal";
 // ---------------------------------------------------------------------------
 
 /** Matches [[Regulation - Article ...]] — flexible to handle LLM format variations */
-const CITATION_WITH_ARTICLE_REGEX = /\[\[([A-Za-z][A-Za-z\s]+?)\s*[-–]\s*Article\s+([^\]]+)\]\]/gi;
+const CITATION_WITH_ARTICLE_REGEX = /\[\[([A-Za-z0-9][A-Za-z0-9\s]+?)\s*[-–]\s*Article\s+([^\]]+)\]\]/gi;
 
 /** Matches [[Regulation]] (no article) */
-const CITATION_NO_ARTICLE_REGEX = /\[\[([A-Za-z][A-Za-z\s]+?)\]\]/g;
+const CITATION_NO_ARTICLE_REGEX = /\[\[([A-Za-z0-9][A-Za-z0-9\s]+?)\]\]/g;
 
 /** Known regulation names */
 const KNOWN_REGULATIONS = ["gdpr", "ai act", "digital services act", "digital markets act", "nis2 directive", "cyber resilience act"];
