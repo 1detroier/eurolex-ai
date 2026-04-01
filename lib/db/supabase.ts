@@ -19,37 +19,56 @@ function getSupabaseClient() {
   if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable");
 
   return createClient(url, key, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 
-/**
- * Reusable Supabase client instance (server-side only).
- *
- * Created lazily so env vars are read at call time, not at import time —
- * this avoids build-time crashes when .env is absent (e.g. CI).
- */
 export function getSupabase() {
   return getSupabaseClient();
 }
 
 // ---------------------------------------------------------------------------
-// Typed RPC helpers
+// Query expansion
 // ---------------------------------------------------------------------------
 
 /**
- * Vector search against `legal_chunks`.
+ * Expand a legal query with related terms to improve full-text search.
  *
- * Calls the `match_legal_chunks` Postgres function which uses pgvector
- * cosine similarity to find the closest chunks to the given embedding.
- *
- * @param embedding - 384-dimensional vector from HuggingFace all-MiniLM-L6-v2
- * @param matchCount - Number of results to return (default: 5)
- * @param matchThreshold - Minimum similarity score 0–1 (default: 0.5)
- * @param regulation - Optional: filter by regulation name (e.g. "GDPR", "AI Act")
+ * Only adds terms not already present in the query.
+ */
+export function expandQuery(query: string): string {
+  const lower = query.toLowerCase();
+  const expansions: [string, string][] = [
+    ["obligations", "responsibilities duties requirements shall must"],
+    ["very large platforms", "VLOPs systemic platforms major providers"],
+    ["very large online platforms", "VLOPs systemic risk"],
+    ["gatekeeper", "gatekeepers designated platforms core platform services"],
+    ["transparency", "reporting disclosure audit"],
+    ["data protection", "privacy personal data processing"],
+    ["incident", "breach notification reporting security"],
+    ["risk", "assessment management mitigation"],
+    ["cybersecurity", "network security information security"],
+    ["erasure", "deletion right to be forgotten removal"],
+  ];
+
+  let expanded = query;
+  for (const [trigger, addition] of expansions) {
+    if (lower.includes(trigger)) {
+      const newTerms = addition.split(" ").filter((t) => !lower.includes(t));
+      if (newTerms.length > 0) {
+        expanded += " " + newTerms.join(" ");
+      }
+    }
+  }
+  return expanded;
+}
+
+// ---------------------------------------------------------------------------
+// Search functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Vector-only search (original). Kept as fallback.
  */
 export async function matchLegalChunks(
   embedding: number[],
@@ -66,23 +85,53 @@ export async function matchLegalChunks(
     p_regulation: regulation ?? null,
   });
 
-  if (error) {
-    throw new Error(`Supabase RPC error: ${error.message}`);
-  }
-
-  // The RPC returns rows directly — cast to our typed result
+  if (error) throw new Error(`Vector search error: ${error.message}`);
   return (data ?? []) as SearchResult[];
 }
 
 /**
- * Fetch all chunks for given regulation names (for citation matching).
+ * Hybrid search: vector similarity + full-text search combined via RRF.
  *
- * The vector search only returns top-N results, but the LLM might cite
- * articles outside those results. This fetches all chunks for the
- * relevant regulations so the citation parser can find matches.
- *
- * @param regulationNames - e.g. ["GDPR", "NIS2 Directive"]
- * @returns All chunks for those regulations (metadata + content only)
+ * This is the primary search function. Falls back to vector-only if
+ * the hybrid RPC fails (e.g., not yet deployed to Supabase).
+ */
+export async function searchLegalChunks(
+  embedding: number[],
+  queryText: string,
+  matchCount = 10,
+  regulation?: string | null
+): Promise<SearchResult[]> {
+  const supabase = getSupabase();
+  const expandedQuery = expandQuery(queryText);
+
+  try {
+    const { data, error } = await supabase.rpc("hybrid_search_legal_chunks", {
+      query_embedding: embedding,
+      query_text: expandedQuery,
+      match_count: matchCount,
+      p_regulation: regulation ?? null,
+    });
+
+    if (error) {
+      console.warn("[search] Hybrid RPC failed, falling back to vector:", error.message);
+      return matchLegalChunks(embedding, matchCount, 0.15, regulation);
+    }
+
+    const results = (data ?? []) as SearchResult[];
+    if (results.length === 0) {
+      // Hybrid returned nothing, try vector as fallback
+      return matchLegalChunks(embedding, matchCount, 0.15, regulation);
+    }
+
+    return results;
+  } catch (err) {
+    console.warn("[search] Hybrid failed, falling back to vector:", err);
+    return matchLegalChunks(embedding, matchCount, 0.15, regulation);
+  }
+}
+
+/**
+ * Fetch chunks by CELEX ID for citation matching.
  */
 export async function fetchChunksByRegulations(
   regulationNames: string[]
@@ -92,7 +141,6 @@ export async function fetchChunksByRegulations(
   const supabase = getSupabase();
   const allData: SearchResult[] = [];
 
-  // Map regulation names to CELEX IDs (avoids JSONB query issues with spaces)
   const REGULATION_TO_CELEX: Record<string, string> = {
     "GDPR": "32016R0679",
     "AI Act": "52021PC0206",

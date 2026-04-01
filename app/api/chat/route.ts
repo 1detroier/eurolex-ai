@@ -17,7 +17,7 @@
  */
 import { NextRequest } from "next/server";
 import { generateEmbedding } from "@/lib/ai/embeddings";
-import { matchLegalChunks, fetchChunksByRegulations } from "@/lib/db/supabase";
+import { searchLegalChunks, matchLegalChunks, fetchChunksByRegulations } from "@/lib/db/supabase";
 import { buildPrompt } from "@/lib/ai/prompts";
 import { streamLLM } from "@/lib/ai/llm-client";
 import { parseCitations } from "@/lib/utils/citations";
@@ -133,21 +133,22 @@ export async function POST(request: NextRequest) {
     return errorResponse(503, "Embedding service unavailable");
   }
 
-  // ── 3. Vector search (Supabase) ───────────────────────────────────────
+  // ── 3. Hybrid search (Supabase) ────────────────────────────────────────
   let chunks: LegalChunk[] = [];
-  let citationChunks: LegalChunk[] = []; // Extended set for citation matching only
+  let citationChunks: LegalChunk[] = [];
 
   try {
-    const results = await matchLegalChunks(
+    // Hybrid search: vector + full-text combined via RRF
+    const results = await searchLegalChunks(
       embedding,
+      message,
       CHUNK_COUNT,
-      SIMILARITY_THRESHOLD,
       regulation
     );
     chunks = results as LegalChunk[];
-    citationChunks = [...chunks]; // Start with search results
+    citationChunks = [...chunks];
 
-    // Fetch ALL chunks for matching regulations (for citation parser only)
+    // Fetch ALL chunks for matching regulations (for citation parser)
     try {
       const uniqueRegs = Array.from(new Set(chunks.map((c) => c.metadata.regulation)));
       if (uniqueRegs.length > 0) {
