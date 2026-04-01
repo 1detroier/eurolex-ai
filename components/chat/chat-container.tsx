@@ -33,7 +33,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
 
   const sendMessage = React.useCallback(
     async (content: string) => {
-      if (!content.trim() || isLoading) return;
+      if (!content || !content.trim() || isLoading) return;
 
       // Add user message to state
       const userMessage: ChatMessage = {
@@ -221,7 +221,9 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
   React.useEffect(() => {
     const handleSuggestion = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
-      sendMessage(customEvent.detail);
+      if (customEvent.detail) {
+        sendMessage(customEvent.detail);
+      }
     };
     window.addEventListener("eurolex-suggestion", handleSuggestion);
     return () =>
