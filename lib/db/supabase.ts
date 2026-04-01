@@ -92,12 +92,25 @@ export async function fetchChunksByRegulations(
   const supabase = getSupabase();
   const allData: SearchResult[] = [];
 
+  // Map regulation names to CELEX IDs (avoids JSONB query issues with spaces)
+  const REGULATION_TO_CELEX: Record<string, string> = {
+    "GDPR": "32016R0679",
+    "AI Act": "52021PC0206",
+    "Digital Services Act": "32022R2065",
+    "Digital Markets Act": "32022R1925",
+    "NIS2 Directive": "32022L2555",
+    "Cyber Resilience Act": "32024R2847",
+  };
+
   for (const name of regulationNames) {
     try {
+      const celexId = REGULATION_TO_CELEX[name];
+      if (!celexId) continue;
+
       const { data } = await supabase
         .from("legal_chunks")
         .select("id, content, metadata")
-        .filter("metadata->>regulation", "eq", name)
+        .eq("metadata->>celex_id", celexId)
         .limit(200);
 
       if (data) {
