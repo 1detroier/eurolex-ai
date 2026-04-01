@@ -92,18 +92,21 @@ export async function fetchChunksByRegulations(
   const supabase = getSupabase();
   const allData: SearchResult[] = [];
 
-  // Query each regulation separately (simpler, more reliable)
   for (const name of regulationNames) {
-    const { data, error } = await supabase
-      .from("legal_chunks")
-      .select("id, content, metadata")
-      .eq("metadata->>regulation", name)
-      .limit(200);
+    try {
+      const { data } = await supabase
+        .from("legal_chunks")
+        .select("id, content, metadata")
+        .filter("metadata->>regulation", "eq", name)
+        .limit(200);
 
-    if (!error && data) {
-      for (const row of data) {
-        allData.push({ ...row, similarity: 0 } as SearchResult);
+      if (data) {
+        for (const row of data) {
+          allData.push({ ...row, similarity: 0 } as SearchResult);
+        }
       }
+    } catch {
+      // Skip failed queries
     }
   }
 
