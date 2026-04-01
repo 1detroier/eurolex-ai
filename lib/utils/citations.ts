@@ -19,16 +19,21 @@ const CITATION_NO_ARTICLE_REGEX = /\[\[([A-Za-z][A-Za-z\s]+?)\]\]/g;
 /** Known regulation names */
 const KNOWN_REGULATIONS = ["gdpr", "ai act", "digital services act", "digital markets act", "nis2 directive", "cyber resilience act"];
 
-/** Extract article number from metadata */
+/** Extract article number from "Article N" or plain "N" format */
 const ARTICLE_NUM_REGEX = /(?:Article|Art\.?)\s+(\d+)/i;
+const PLAIN_NUM_REGEX = /^(\d+)/;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function extractArticleNumber(article: string): string | null {
+  // Try "Article N" format first
   const match = article.match(ARTICLE_NUM_REGEX);
-  return match ? match[1] : null;
+  if (match) return match[1];
+  // Try plain number (from citation parser: "23-1(2)" → "23")
+  const plain = article.match(PLAIN_NUM_REGEX);
+  return plain ? plain[1] : null;
 }
 
 function buildEurlexUrl(celexId: string, articleNumber?: string): string {
