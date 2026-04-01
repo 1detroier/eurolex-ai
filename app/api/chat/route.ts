@@ -135,20 +135,19 @@ export async function POST(request: NextRequest) {
 
   // ── 3. Vector search (Supabase) ───────────────────────────────────────
   let chunks: LegalChunk[] = [];
+  let citationChunks: LegalChunk[] = []; // Extended set for citation matching only
 
   try {
-    console.log(`[chat] Embedding dims: ${embedding.length}`);
     const results = await matchLegalChunks(
       embedding,
       CHUNK_COUNT,
       SIMILARITY_THRESHOLD,
       regulation
     );
-    // SearchResult and LegalChunk have the same shape — safe cast
     chunks = results as LegalChunk[];
-    console.log(`[chat] Search returned ${chunks.length} chunks`);
+    citationChunks = [...chunks]; // Start with search results
 
-    // Fetch ALL chunks for matching regulations (for citation parser)
+    // Fetch ALL chunks for matching regulations (for citation parser only)
     try {
       const uniqueRegs = Array.from(new Set(chunks.map((c) => c.metadata.regulation)));
       if (uniqueRegs.length > 0) {
@@ -156,18 +155,17 @@ export async function POST(request: NextRequest) {
         const seen = new Set(chunks.map((c) => c.id));
         for (const rc of allRegChunks) {
           if (!seen.has(rc.id)) {
-            chunks.push(rc as LegalChunk);
+            citationChunks.push(rc as LegalChunk);
           }
         }
-        console.log(`[chat] Total chunks (search + regulation): ${chunks.length}`);
       }
     } catch (fetchErr) {
-      console.error("[chat] fetchChunksByRegulations failed (non-fatal):", fetchErr);
+      // Non-fatal — citation matching just uses search results
     }
   } catch (error) {
-    // Supabase failure is non-fatal — the LLM can still answer general questions
-    console.error("[chat] Supabase search failed, continuing without context:", error);
+    console.error("[chat] Supabase search failed:", error);
     chunks = [];
+    citationChunks = [];
   }
 
   // ── 4. Build prompt ───────────────────────────────────────────────────
@@ -225,7 +223,7 @@ export async function POST(request: NextRequest) {
 
           // ── Parse citations from accumulated text ──
           if (chunks.length > 0) {
-            const citations = parseCitations(accumulatedText, chunks);
+            const citations = parseCitations(accumulatedText, citationChunks);
 
             for (const citation of citations) {
               const key = `${citation.regulation}:${citation.article}`;
