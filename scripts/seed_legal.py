@@ -456,6 +456,8 @@ def build_article_chunks(
             "chunk_index": i,
         }
 
+        chunk_meta["content_hash"] = _content_hash(content, chunk_meta)
+
         chunks.append({
             "content": content,
             "metadata": chunk_meta,
@@ -539,6 +541,11 @@ def chunk_text(text: str, regulation_key: str) -> list[dict]:
                 "chunk_index": len(chunks),
                 "char_start": start,
                 "char_end": end,
+                "content_hash": _content_hash(chunk_content, {
+                    "regulation": meta["name"],
+                    "celex_id": meta["celex_id"],
+                    "article": article or "Unknown",
+                }),
             },
         })
 
