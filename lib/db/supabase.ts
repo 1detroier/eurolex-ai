@@ -139,10 +139,74 @@ export async function matchLegalChunks(
 }
 
 /**
+ * Ensure we have enough context by filling gaps with regulation-specific
+ * chunks.  If the hybrid / vector search returned nothing for a regulation
+ * mentioned in the query, fetch chunks directly by metadata match.
+ */
+async function fillFromKnownRegulations(
+  existing: SearchResult[],
+  queryText: string,
+  count: number
+): Promise<SearchResult[]> {
+  const lower = queryText.toLowerCase();
+  const knownRegs: [string, string][] = [
+    ["dsa", "Digital Services Act"],
+    ["digital services act", "Digital Services Act"],
+    ["dma", "Digital Markets Act"],
+    ["digital markets act", "Digital Markets Act"],
+    ["gdpr", "GDPR"],
+    ["general data protection", "GDPR"],
+    ["ai act", "AI Act"],
+    ["artificial intelligence act", "AI Act"],
+    ["nis2", "NIS2 Directive"],
+    ["nis2 directive", "NIS2 Directive"],
+    ["cra", "Cyber Resilience Act"],
+    ["cyber resilience act", "Cyber Resilience Act"],
+  ];
+
+  const mentioned = new Set<string>();
+  for (const [trigger, name] of knownRegs) {
+    if (lower.includes(trigger)) mentioned.add(name);
+  }
+  if (mentioned.size === 0) return existing;
+
+  const existingRegs = new Set(
+    existing.map((r) => (r.metadata as Record<string, unknown>)?.regulation as string)
+  );
+
+  // Only fetch regulations that were mentioned but not yet returned
+  const missing = Array.from(mentioned).filter((r) => !existingRegs.has(r));
+  if (missing.length === 0) return existing;
+
+  const supabase = getSupabase();
+  const extra: SearchResult[] = [];
+
+  for (const regName of missing) {
+    try {
+      const { data } = await supabase
+        .from("legal_chunks")
+        .select("id, content, metadata")
+        .eq("metadata->>regulation", regName)
+        .limit(count);
+
+      if (data) {
+        for (const row of data) {
+          extra.push({ ...row, similarity: 0 } as SearchResult);
+        }
+      }
+    } catch {
+      // Skip failed queries
+    }
+  }
+
+  return [...existing, ...extra];
+}
+
+/**
  * Hybrid search: vector similarity + full-text search combined via RRF.
  *
- * This is the primary search function. Falls back to vector-only if
- * the hybrid RPC fails (e.g., not yet deployed to Supabase).
+ * This is the primary search function. Falls back to vector-only, then
+ * to direct regulation lookup if the hybrid RPC fails or returns nothing.
  */
 export async function searchLegalChunks(
   embedding: number[],
@@ -167,12 +231,18 @@ export async function searchLegalChunks(
     }
 
     const results = (data ?? []) as SearchResult[];
-    if (results.length === 0) {
-      // Hybrid returned nothing, try vector as fallback
-      return matchLegalChunks(embedding, matchCount, 0.15, regulation);
+
+    // If hybrid returned too few results, fill from known regulations
+    if (results.length < 3) {
+      const filled = await fillFromKnownRegulations(results, queryText, matchCount);
+      if (filled.length > 0) return filled;
     }
 
-    return results;
+    if (results.length > 0) return results;
+
+    // Hybrid returned nothing — try vector as fallback
+    const vectorResults = await matchLegalChunks(embedding, matchCount, 0.15, regulation);
+    return await fillFromKnownRegulations(vectorResults, queryText, matchCount);
   } catch (err) {
     console.warn("[search] Hybrid failed, falling back to vector:", err);
     return matchLegalChunks(embedding, matchCount, 0.15, regulation);
