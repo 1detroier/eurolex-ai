@@ -61,9 +61,8 @@ BEGIN
             COALESCE(v.id, f.id) AS result_id,
             COALESCE(v.content, f.content) AS result_content,
             COALESCE(v.metadata, f.metadata) AS result_metadata,
-            -- RRF: 1/(k + rank), k=60 is standard
-            COALESCE(1.0 / (60 + v.vector_rank), 0) * 0.6 +
-            COALESCE(1.0 / (60 + f.fts_rank), 0) * 0.4 AS combined_score
+            (COALESCE(1.0 / (60 + v.vector_rank), 0) * 0.6 +
+            COALESCE(1.0 / (60 + f.fts_rank), 0) * 0.4)::double precision AS combined_score
         FROM vector_results v
         FULL OUTER JOIN fts_results f ON v.id = f.id
     )

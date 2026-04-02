@@ -190,8 +190,7 @@ def sparql_query(celex_id: str) -> dict:
 def fetch_xhtml(manifestation_uri: str) -> str:
     """Fetch XHTML content via content negotiation.
 
-    Uses Accept: application/xhtml+xml to get clean XHTML from the
-    CELLAR manifestation URI.
+    Handles 300 Multiple-Choice responses by following the DOC_1 link.
 
     Args:
         manifestation_uri: Full URI from SPARQL query.
@@ -203,14 +202,21 @@ def fetch_xhtml(manifestation_uri: str) -> str:
         EURLexError: If fetch fails after retries.
     """
     _rate_limit()
+    headers = {"Accept": "application/xhtml+xml"}
 
     for attempt in range(MAX_RETRIES):
         try:
-            resp = requests.get(
-                manifestation_uri,
-                headers={"Accept": "application/xhtml+xml"},
-                timeout=60,
-            )
+            resp = requests.get(manifestation_uri, headers=headers, timeout=60)
+
+            # Handle 300 Multiple-Choice: follow DOC_1 link
+            if resp.status_code == 300:
+                import re as _re
+                doc_match = _re.search(r'href="([^"]*DOC_1[^"]*)"', resp.text)
+                if doc_match:
+                    doc_url = doc_match.group(1)
+                    logger.info(f"  Following 300 redirect to DOC_1")
+                    resp = requests.get(doc_url, headers=headers, timeout=60)
+
             resp.raise_for_status()
             return resp.text
 
