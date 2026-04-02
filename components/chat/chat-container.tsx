@@ -33,12 +33,13 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
 
   const sendMessage = React.useCallback(
     async (content: string) => {
-      if (!content || !content.trim() || isLoading) return;
+      const text = typeof content === "string" ? content : String(content ?? "");
+      if (!text.trim() || isLoading) return;
 
       // Add user message to state
       const userMessage: ChatMessage = {
         role: "user",
-        content: content.trim(),
+        content: text.trim(),
         timestamp: Date.now(),
       };
 
@@ -65,7 +66,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: content.trim(),
+            message: text.trim(),
             history,
             regulation: selectedRegulation,
           }),
