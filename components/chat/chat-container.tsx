@@ -217,19 +217,6 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
     [isLoading, messages, selectedRegulation]
   );
 
-  // Listen for suggestion clicks from MessageList
-  React.useEffect(() => {
-    const handleSuggestion = (e: Event) => {
-      const customEvent = e as CustomEvent<string>;
-      if (customEvent.detail) {
-        sendMessage(customEvent.detail);
-      }
-    };
-    window.addEventListener("eurolex-suggestion", handleSuggestion);
-    return () =>
-      window.removeEventListener("eurolex-suggestion", handleSuggestion);
-  }, [sendMessage]);
-
   const handleClearChat = React.useCallback(() => {
     setMessages([]);
     setSelectedCitation(null);
@@ -242,6 +229,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
         messages={messages}
         isLoading={isLoading}
         onOpenCitationModal={handleOpenCitationModal}
+        onSuggestion={sendMessage}
       />
 
       {/* Action toolbar */}

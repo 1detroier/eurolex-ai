@@ -10,6 +10,7 @@ interface MessageListProps {
   messages: ChatMessageType[];
   isLoading: boolean;
   onOpenCitationModal: (citation: Citation) => void;
+  onSuggestion?: (text: string) => void;
 }
 
 const SUGGESTIONS = [
@@ -24,6 +25,7 @@ export function MessageList({
   messages,
   isLoading,
   onOpenCitationModal,
+  onSuggestion,
 }: MessageListProps) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -50,7 +52,7 @@ export function MessageList({
             How can I help?
           </h2>
           <p className="max-w-md text-sm text-muted-foreground">
-            Ask about EU regulations — GDPR, AI Act, DSA, DMA, NIS2, CRA.
+            Ask about EU regulations — GDPR, AI Act, DSA, DMA.
           </p>
         </div>
 
@@ -60,10 +62,9 @@ export function MessageList({
               key={suggestion}
               className="rounded-xl border border-[hsl(var(--neutral-20))] bg-[hsl(var(--neutral-5))] px-3.5 py-3 text-left text-sm text-foreground transition-all hover:border-[hsl(var(--accent-50)/0.3)] hover:bg-[hsl(var(--accent-50)/0.04)]"
               onClick={() => {
-                const event = new CustomEvent("eurolex-suggestion", {
-                  detail: suggestion,
-                });
-                window.dispatchEvent(event);
+                if (onSuggestion) {
+                  onSuggestion(suggestion);
+                }
               }}
             >
               {suggestion}
