@@ -33,7 +33,8 @@ function InlineCitationText({
       parts.push(text.slice(lastIndex, match.index));
     }
 
-    const regulation = match[1].trim();
+    const rawRegulation = match[1] ?? match[3] ?? "";
+    const regulation = rawRegulation.trim();
     const article = match[2];
     const fullMatch = match[0];
 
