@@ -26,6 +26,7 @@ yarn-error.log*
 
 # AI Agent tools (local config)
 .agents/
+skills-lock.json
 
 # OS
 .DS_Store
