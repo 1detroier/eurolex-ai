@@ -25,6 +25,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
   const [isLoading, setIsLoading] = React.useState(false);
   const [selectedCitation, setSelectedCitation] = React.useState<Citation | null>(null);
   const [citationModalOpen, setCitationModalOpen] = React.useState(false);
+  const abortRef = React.useRef(false);
 
   const handleOpenCitationModal = React.useCallback((citation: Citation) => {
     setSelectedCitation(citation);
@@ -35,6 +36,11 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
     async (content: string) => {
       const text = typeof content === "string" ? content : String(content ?? "");
       if (!text.trim() || isLoading) return;
+
+      // Abort any previous stream
+      abortRef.current = true;
+      await new Promise((r) => setTimeout(r, 10));
+      abortRef.current = false;
 
       // Add user message to state
       const userMessage: ChatMessage = {
@@ -113,8 +119,10 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
 
                 switch (currentEventType) {
                   case "chunk": {
+                    if (abortRef.current) break;
                     accumulatedContent += data.content;
                     setMessages((prev) => {
+                      if (abortRef.current) return prev;
                       const updated = [...prev];
                       const last = updated[updated.length - 1];
                       if (last && last.role === "assistant") {
@@ -129,6 +137,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
                   }
 
                   case "citation": {
+                    if (abortRef.current) break;
                     const citeData = data as CitationEventData;
                     const citation: Citation = {
                       id: `${citeData.regulation}:${citeData.article}`,
@@ -141,6 +150,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
                     };
 
                     setMessages((prev) => {
+                      if (abortRef.current) return prev;
                       const updated = [...prev];
                       const last = updated[updated.length - 1];
                       if (last && last.role === "assistant") {
@@ -219,7 +229,9 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
   );
 
   const handleClearChat = React.useCallback(() => {
+    abortRef.current = true;
     setMessages([]);
+    setIsLoading(false);
     setSelectedCitation(null);
     setCitationModalOpen(false);
   }, []);
