@@ -49,6 +49,55 @@ export function expandQuery(query: string): string {
     ["risk", "assessment management mitigation"],
     ["cybersecurity", "network security information security"],
     ["erasure", "deletion right to be forgotten removal"],
+    // Regulation acronyms and shorthand
+    [
+      "dsa",
+      "digital services act very large online platforms moderation systemic risk obligations"
+    ],
+    [
+      "digital services act",
+      "DSA very large online platforms obligations systemic risk notice and action"
+    ],
+    [
+      "dma",
+      "digital markets act gatekeepers interoperability self-preferencing obligation"
+    ],
+    [
+      "digital markets act",
+      "DMA gatekeepers obligations interoperability data access"
+    ],
+    [
+      "gdpr",
+      "general data protection regulation processing lawful basis data subject rights"
+    ],
+    [
+      "general data protection regulation",
+      "GDPR controller obligations processor DPIA data minimisation"
+    ],
+    [
+      "ai act",
+      "artificial intelligence act risk classification transparency requirements"
+    ],
+    [
+      "artificial intelligence act",
+      "AI Act high-risk systems conformity assessment obligations"
+    ],
+    [
+      "nis2",
+      "nis2 directive cybersecurity incident reporting essential entities"
+    ],
+    [
+      "nis2 directive",
+      "NIS2 cybersecurity requirements supervision enforcement"
+    ],
+    [
+      "cra",
+      "cyber resilience act security-by-design vulnerability handling"
+    ],
+    [
+      "cyber resilience act",
+      "CRA conformity assessment essential requirements security updates"
+    ],
   ];
 
   let expanded = query;
