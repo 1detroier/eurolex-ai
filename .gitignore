@@ -24,6 +24,9 @@ yarn-error.log*
 *.swp
 *.swo
 
+# AI Agent tools (local config)
+.agents/
+
 # OS
 .DS_Store
 Thumbs.db
