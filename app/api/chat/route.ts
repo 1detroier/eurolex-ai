@@ -34,7 +34,7 @@ const MAX_MESSAGE_LENGTH = 4000;
 const SIMILARITY_THRESHOLD = 0.15;
 
 /** Number of chunks to retrieve from Supabase. */
-const CHUNK_COUNT = 8;
+const CHUNK_COUNT = 14;
 
 /** SSE response headers (includes CORS for cross-origin clients). */
 const SSE_HEADERS: Record<string, string> = {
