@@ -138,6 +138,7 @@ async function callProvider(config: ProviderConfig, systemPrompt: string, userPr
           { role: "user", content: userPrompt },
         ],
         max_tokens: 1024,
+        temperature: 0.3,
         stream: true,
       }),
       signal: controller.signal,

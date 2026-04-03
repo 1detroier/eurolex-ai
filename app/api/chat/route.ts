@@ -17,7 +17,7 @@
  */
 import { NextRequest } from "next/server";
 import { generateEmbedding } from "@/lib/ai/embeddings";
-import { searchLegalChunks, matchLegalChunks, fetchChunksByRegulations } from "@/lib/db/supabase";
+import { searchLegalChunks, matchLegalChunks, fetchChunksByRegulations, detectRegulationFilter } from "@/lib/db/supabase";
 import { buildPrompt } from "@/lib/ai/prompts";
 import { streamLLM } from "@/lib/ai/llm-client";
 import { parseCitations } from "@/lib/utils/citations";
@@ -133,6 +133,9 @@ export async function POST(request: NextRequest) {
     return errorResponse(503, "Embedding service unavailable");
   }
 
+  // ── 2b. Auto-detect regulation filter (client param takes precedence) ─
+  const effectiveRegulation = regulation || detectRegulationFilter(message);
+
   // ── 3. Hybrid search (Supabase) ────────────────────────────────────────
   let chunks: LegalChunk[] = [];
   let citationChunks: LegalChunk[] = [];
@@ -143,7 +146,7 @@ export async function POST(request: NextRequest) {
       embedding,
       message,
       CHUNK_COUNT,
-      regulation
+      effectiveRegulation
     );
     chunks = results as LegalChunk[];
     citationChunks = [...chunks];

@@ -113,6 +113,47 @@ export function expandQuery(query: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Regulation auto-detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect if the user query mentions exactly one known regulation.
+ *
+ * Returns the regulation name for filtering when a single regulation is
+ * mentioned, or `null` when zero or multiple are detected (to avoid
+ * over-filtering cross-regulation queries).
+ *
+ * Case-insensitive. Handles both acronyms (DSA, DMA) and full names.
+ */
+export function detectRegulationFilter(query: string): string | null {
+  const lower = query.toLowerCase();
+
+  const checks: [string, string][] = [
+    ["dsa", "Digital Services Act"],
+    ["digital services act", "Digital Services Act"],
+    ["dma", "Digital Markets Act"],
+    ["digital markets act", "Digital Markets Act"],
+    ["gdpr", "GDPR"],
+    ["general data protection regulation", "GDPR"],
+    ["ai act", "AI Act"],
+    ["artificial intelligence act", "AI Act"],
+    ["nis2", "NIS2 Directive"],
+    ["nis2 directive", "NIS2 Directive"],
+    ["cra", "Cyber Resilience Act"],
+    ["cyber resilience act", "Cyber Resilience Act"],
+  ];
+
+  const found = new Set<string>();
+  for (const [trigger, name] of checks) {
+    if (lower.includes(trigger)) {
+      found.add(name);
+    }
+  }
+
+  return found.size === 1 ? Array.from(found)[0] : null;
+}
+
+// ---------------------------------------------------------------------------
 // Search functions
 // ---------------------------------------------------------------------------
 
