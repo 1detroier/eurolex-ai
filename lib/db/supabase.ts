@@ -28,80 +28,158 @@ export function getSupabase() {
 }
 
 // ---------------------------------------------------------------------------
+// Regulation registry (single source of truth)
+// ---------------------------------------------------------------------------
+
+/**
+ * Canonical list of every regulation in the corpus.
+ * Each entry maps triggers (acronyms, aliases, full names) to the
+ * canonical name stored in `metadata.regulation`.
+ *
+ * To add a new regulation, append an entry here.  All downstream
+ * functions (detection, expansion, fallback) use this registry
+ * automatically — no other code changes needed.
+ */
+export const REGULATION_REGISTRY: {
+  /** Canonical name as stored in metadata.regulation */
+  canonical: string;
+  /** CELEX ID for direct Supabase queries */
+  celexId: string;
+  /** All trigger strings that should match this regulation (case-insensitive) */
+  triggers: string[];
+}[] = [
+  {
+    canonical: "GDPR",
+    celexId: "32016R0679",
+    triggers: ["gdpr", "general data protection regulation", "general data protection"],
+  },
+  {
+    canonical: "AI Act",
+    celexId: "52021PC0206",
+    triggers: ["ai act", "artificial intelligence act"],
+  },
+  {
+    canonical: "Digital Services Act",
+    celexId: "32022R2065",
+    triggers: ["dsa", "digital services act"],
+  },
+  {
+    canonical: "Digital Markets Act",
+    celexId: "32022R1925",
+    triggers: ["dma", "digital markets act"],
+  },
+  {
+    canonical: "NIS2 Directive",
+    celexId: "32022L2555",
+    triggers: ["nis2", "nis2 directive"],
+  },
+  {
+    canonical: "Cyber Resilience Act",
+    celexId: "32024R2847",
+    triggers: ["cra", "cyber resilience act"],
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Domain synonym library
+// ---------------------------------------------------------------------------
+
+/**
+ * Domain-agnostic synonym expansion for full-text search.
+ *
+ * Each entry maps a trigger phrase to additional terms that should be
+ * included in the tsvector query.  Only adds terms not already present
+ * in the original query.
+ *
+ * This library is independent of the regulation registry — it contains
+ * conceptual synonyms that apply across any legal or compliance corpus.
+ *
+ * To adapt to a new corpus:
+ * - Add entries for domain-specific jargon
+ * - Add regulation-specific expansions using the canonical name
+ */
+const SYNONYM_LIBRARY: [string, string][] = [
+  // ── Generic legal concepts ──
+  ["obligations", "responsibilities duties requirements shall must"],
+  ["transparency", "reporting disclosure audit"],
+  ["data protection", "privacy personal data processing"],
+  ["incident", "breach notification reporting security"],
+  ["risk", "assessment management mitigation"],
+  ["cybersecurity", "network security information security"],
+  ["erasure", "deletion right to be forgotten removal"],
+
+  // ── Regulation-specific (use canonical names from REGULATION_REGISTRY) ──
+  // GDPR
+  [
+    "gdpr",
+    "general data protection regulation processing lawful basis data subject rights"
+  ],
+  [
+    "general data protection regulation",
+    "GDPR controller obligations processor DPIA data minimisation"
+  ],
+  // AI Act
+  [
+    "ai act",
+    "artificial intelligence act risk classification transparency requirements"
+  ],
+  [
+    "artificial intelligence act",
+    "AI Act high-risk systems conformity assessment obligations"
+  ],
+  // DSA
+  [
+    "dsa",
+    "digital services act very large online platforms moderation systemic risk obligations"
+  ],
+  [
+    "digital services act",
+    "DSA very large online platforms obligations systemic risk notice and action"
+  ],
+  // DMA
+  [
+    "dma",
+    "digital markets act gatekeepers interoperability self-preferencing obligation"
+  ],
+  [
+    "digital markets act",
+    "DMA gatekeepers obligations interoperability data access"
+  ],
+  // NIS2
+  [
+    "nis2",
+    "nis2 directive cybersecurity incident reporting essential entities"
+  ],
+  [
+    "nis2 directive",
+    "NIS2 cybersecurity requirements supervision enforcement"
+  ],
+  // CRA
+  [
+    "cra",
+    "cyber resilience act security-by-design vulnerability handling"
+  ],
+  [
+    "cyber resilience act",
+    "CRA conformity assessment essential requirements security updates"
+  ],
+];
+
+// ---------------------------------------------------------------------------
 // Query expansion
 // ---------------------------------------------------------------------------
 
 /**
- * Expand a legal query with related terms to improve full-text search.
+ * Expand a legal query with related terms from the synonym library
+ * to improve full-text search recall.
  *
  * Only adds terms not already present in the query.
  */
 export function expandQuery(query: string): string {
   const lower = query.toLowerCase();
-  const expansions: [string, string][] = [
-    ["obligations", "responsibilities duties requirements shall must"],
-    ["very large platforms", "VLOPs systemic platforms major providers"],
-    ["very large online platforms", "VLOPs systemic risk"],
-    ["gatekeeper", "gatekeepers designated platforms core platform services"],
-    ["transparency", "reporting disclosure audit"],
-    ["data protection", "privacy personal data processing"],
-    ["incident", "breach notification reporting security"],
-    ["risk", "assessment management mitigation"],
-    ["cybersecurity", "network security information security"],
-    ["erasure", "deletion right to be forgotten removal"],
-    // Regulation acronyms and shorthand
-    [
-      "dsa",
-      "digital services act very large online platforms moderation systemic risk obligations"
-    ],
-    [
-      "digital services act",
-      "DSA very large online platforms obligations systemic risk notice and action"
-    ],
-    [
-      "dma",
-      "digital markets act gatekeepers interoperability self-preferencing obligation"
-    ],
-    [
-      "digital markets act",
-      "DMA gatekeepers obligations interoperability data access"
-    ],
-    [
-      "gdpr",
-      "general data protection regulation processing lawful basis data subject rights"
-    ],
-    [
-      "general data protection regulation",
-      "GDPR controller obligations processor DPIA data minimisation"
-    ],
-    [
-      "ai act",
-      "artificial intelligence act risk classification transparency requirements"
-    ],
-    [
-      "artificial intelligence act",
-      "AI Act high-risk systems conformity assessment obligations"
-    ],
-    [
-      "nis2",
-      "nis2 directive cybersecurity incident reporting essential entities"
-    ],
-    [
-      "nis2 directive",
-      "NIS2 cybersecurity requirements supervision enforcement"
-    ],
-    [
-      "cra",
-      "cyber resilience act security-by-design vulnerability handling"
-    ],
-    [
-      "cyber resilience act",
-      "CRA conformity assessment essential requirements security updates"
-    ],
-  ];
 
   let expanded = query;
-  for (const [trigger, addition] of expansions) {
+  for (const [trigger, addition] of SYNONYM_LIBRARY) {
     if (lower.includes(trigger)) {
       const newTerms = addition.split(" ").filter((t) => !lower.includes(t));
       if (newTerms.length > 0) {
@@ -119,34 +197,23 @@ export function expandQuery(query: string): string {
 /**
  * Detect if the user query mentions exactly one known regulation.
  *
- * Returns the regulation name for filtering when a single regulation is
- * mentioned, or `null` when zero or multiple are detected (to avoid
- * over-filtering cross-regulation queries).
+ * Returns the canonical regulation name for filtering when a single
+ * regulation is mentioned, or `null` when zero or multiple are detected
+ * (to avoid over-filtering cross-regulation queries).
  *
- * Case-insensitive. Handles both acronyms (DSA, DMA) and full names.
+ * Case-insensitive. Uses the REGULATION_REGISTRY so new regulations
+ * are detected automatically.
  */
 export function detectRegulationFilter(query: string): string | null {
   const lower = query.toLowerCase();
 
-  const checks: [string, string][] = [
-    ["dsa", "Digital Services Act"],
-    ["digital services act", "Digital Services Act"],
-    ["dma", "Digital Markets Act"],
-    ["digital markets act", "Digital Markets Act"],
-    ["gdpr", "GDPR"],
-    ["general data protection regulation", "GDPR"],
-    ["ai act", "AI Act"],
-    ["artificial intelligence act", "AI Act"],
-    ["nis2", "NIS2 Directive"],
-    ["nis2 directive", "NIS2 Directive"],
-    ["cra", "Cyber Resilience Act"],
-    ["cyber resilience act", "Cyber Resilience Act"],
-  ];
-
   const found = new Set<string>();
-  for (const [trigger, name] of checks) {
-    if (lower.includes(trigger)) {
-      found.add(name);
+  for (const reg of REGULATION_REGISTRY) {
+    for (const trigger of reg.triggers) {
+      if (lower.includes(trigger)) {
+        found.add(reg.canonical);
+        break; // One match per regulation is enough
+      }
     }
   }
 
@@ -180,74 +247,52 @@ export async function matchLegalChunks(
 }
 
 /**
- * Ensure we have enough context by filling gaps with regulation-specific
- * chunks.  If the hybrid / vector search returned nothing for a regulation
- * mentioned in the query, fetch chunks directly by metadata match.
+ * Generic re-ranking: if a regulation was detected, keep only results
+ * from that regulation.  If the filtered set is too small, fetch
+ * directly from the regulation as a fallback.
+ *
+ * This replaces regulation-specific hacks (like the old DSA VLOP
+ * injection) with a single, corpus-agnostic algorithm.
  */
-async function fillFromKnownRegulations(
-  existing: SearchResult[],
+async function rerankByRegulation(
+  results: SearchResult[],
   queryText: string,
-  count: number
+  matchCount: number,
+  detectedReg: string | null
 ): Promise<SearchResult[]> {
-  const lower = queryText.toLowerCase();
-  const knownRegs: [string, string][] = [
-    ["dsa", "Digital Services Act"],
-    ["digital services act", "Digital Services Act"],
-    ["dma", "Digital Markets Act"],
-    ["digital markets act", "Digital Markets Act"],
-    ["gdpr", "GDPR"],
-    ["general data protection", "GDPR"],
-    ["ai act", "AI Act"],
-    ["artificial intelligence act", "AI Act"],
-    ["nis2", "NIS2 Directive"],
-    ["nis2 directive", "NIS2 Directive"],
-    ["cra", "Cyber Resilience Act"],
-    ["cyber resilience act", "Cyber Resilience Act"],
-  ];
+  if (!detectedReg) return results;
 
-  const mentioned = new Set<string>();
-  for (const [trigger, name] of knownRegs) {
-    if (lower.includes(trigger)) mentioned.add(name);
-  }
-  if (mentioned.size === 0) return existing;
-
-  const existingRegs = new Set(
-    existing.map((r) => (r.metadata as Record<string, unknown>)?.regulation as string)
+  // Filter to the detected regulation
+  const filtered = results.filter(
+    (r) => (r.metadata as Record<string, unknown>)?.regulation === detectedReg
   );
 
-  // Only fetch regulations that were mentioned but not yet returned
-  const missing = Array.from(mentioned).filter((r) => !existingRegs.has(r));
-  if (missing.length === 0) return existing;
+  // If we have enough results from the right regulation, return them
+  if (filtered.length >= 3) return filtered;
 
+  // Not enough — fetch directly from the regulation
   const supabase = getSupabase();
-  const extra: SearchResult[] = [];
+  const { data } = await supabase
+    .from("legal_chunks")
+    .select("id, content, metadata")
+    .eq("metadata->>regulation", detectedReg)
+    .limit(matchCount);
 
-  for (const regName of missing) {
-    try {
-      const { data } = await supabase
-        .from("legal_chunks")
-        .select("id, content, metadata")
-        .eq("metadata->>regulation", regName)
-        .limit(count);
-
-      if (data) {
-        for (const row of data) {
-          extra.push({ ...row, similarity: 0 } as SearchResult);
-        }
-      }
-    } catch {
-      // Skip failed queries
-    }
+  if (data && data.length > 0) {
+    return data.map((d) => ({ ...d, similarity: 0.99 } as SearchResult));
   }
 
-  return [...existing, ...extra];
+  // Direct fetch also failed — return original results
+  return results;
 }
 
 /**
  * Hybrid search: vector similarity + full-text search combined via RRF.
  *
- * This is the primary search function. Falls back to vector-only, then
- * to direct regulation lookup if the hybrid RPC fails or returns nothing.
+ * Primary search function with generic fallback chain:
+ * 1. Hybrid RPC (vector + FTS fused via RRF)
+ * 2. Re-rank by detected regulation (filters out wrong-regulation noise)
+ * 3. Vector-only fallback
  */
 export async function searchLegalChunks(
   embedding: number[],
@@ -258,40 +303,42 @@ export async function searchLegalChunks(
   const supabase = getSupabase();
   const expandedQuery = expandQuery(queryText);
 
+  // Client-provided filter takes precedence over auto-detection
+  const effectiveReg = regulation ?? detectRegulationFilter(queryText);
+
   try {
     const { data, error } = await supabase.rpc("hybrid_search_legal_chunks", {
       query_embedding: embedding,
       query_text: expandedQuery,
       match_count: matchCount,
-      p_regulation: regulation ?? null,
+      p_regulation: effectiveReg ?? null,
     });
 
     if (error) {
       console.warn("[search] Hybrid RPC failed, falling back to vector:", error.message);
-      return matchLegalChunks(embedding, matchCount, 0.15, regulation);
+      const vectorResults = await matchLegalChunks(embedding, matchCount, 0.15, effectiveReg);
+      return rerankByRegulation(vectorResults, queryText, matchCount, effectiveReg);
     }
 
-    const results = (data ?? []) as SearchResult[];
+    let results = (data ?? []) as SearchResult[];
 
-    // If hybrid returned too few results, fill from known regulations
-    if (results.length < 3) {
-      const filled = await fillFromKnownRegulations(results, queryText, matchCount);
-      if (filled.length > 0) return filled;
-    }
+    // Re-rank: filter to detected regulation, fallback to direct fetch if sparse
+    results = await rerankByRegulation(results, queryText, matchCount, effectiveReg);
 
     if (results.length > 0) return results;
 
-    // Hybrid returned nothing — try vector as fallback
-    const vectorResults = await matchLegalChunks(embedding, matchCount, 0.15, regulation);
-    return await fillFromKnownRegulations(vectorResults, queryText, matchCount);
+    // Everything failed — try vector as last resort
+    const vectorResults = await matchLegalChunks(embedding, matchCount, 0.15, effectiveReg);
+    return rerankByRegulation(vectorResults, queryText, matchCount, effectiveReg);
   } catch (err) {
     console.warn("[search] Hybrid failed, falling back to vector:", err);
-    return matchLegalChunks(embedding, matchCount, 0.15, regulation);
+    return matchLegalChunks(embedding, matchCount, 0.15, effectiveReg);
   }
 }
 
 /**
  * Fetch chunks by CELEX ID for citation matching.
+ * Uses REGULATION_REGISTRY so new regulations work automatically.
  */
 export async function fetchChunksByRegulations(
   regulationNames: string[]
@@ -301,14 +348,11 @@ export async function fetchChunksByRegulations(
   const supabase = getSupabase();
   const allData: SearchResult[] = [];
 
-  const REGULATION_TO_CELEX: Record<string, string> = {
-    "GDPR": "32016R0679",
-    "AI Act": "52021PC0206",
-    "Digital Services Act": "32022R2065",
-    "Digital Markets Act": "32022R1925",
-    "NIS2 Directive": "32022L2555",
-    "Cyber Resilience Act": "32024R2847",
-  };
+  // Build CELEX lookup from registry
+  const REGULATION_TO_CELEX: Record<string, string> = {};
+  for (const reg of REGULATION_REGISTRY) {
+    REGULATION_TO_CELEX[reg.canonical] = reg.celexId;
+  }
 
   for (const name of regulationNames) {
     try {
