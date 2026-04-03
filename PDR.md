@@ -1,9 +1,9 @@
 # EuroLex AI — Product Design Review (PDR)
 
-**Document Version**: 5.0
-**Date**: 2026-04-02
+**Document Version**: 6.0
+**Date**: 2026-04-04
 **Status**: Active development
-**Stack**: Next.js 14, Python (ETL), Supabase (pgvector), Vercel, Groq, Cerebras, HuggingFace
+**Stack**: Next.js 14, Python (ETL), Supabase (pgvector), Vercel, Groq, Cerebras, Google AI Studio
 **Constraint**: 100% Free Tier
 **Previous version**: PDR-original.md (v4.0, 2026-03-30)
 
@@ -19,7 +19,7 @@ EuroLex AI is a RAG (Retrieval-Augmented Generation) assistant specialised in Eu
 - **Hybrid search**: pgvector cosine similarity + tsvector full-text search, fused via Reciprocal Rank Fusion (RRF)
 - **Streaming**: custom Server-Sent Events implementation for real-time token delivery
 - **LLM**: Groq `llama-3.3-70b-versatile` (primary), Cerebras `llama3.1-8b` (fallback)
-- **Embeddings**: HuggingFace Inference API (`all-mpnet-base-v2`, 768-dim)
+- **Embeddings**: Google AI Studio (`gemini-embedding-001`, 1536-dim)
 - **ETL**: Python pipeline fetching directly from EUR-Lex SPARQL + content negotiation
 - **Session persistence**: browser localStorage (no server-side KV required)
 
@@ -56,12 +56,12 @@ While the current corpus covers EU regulations, the architecture is document-agn
 
 | Regulation | CELEX ID | Chunks | Notes |
 |------------|----------|--------|-------|
-| GDPR | 32016R0679 | ~250 | EUR-Lex fetch |
-| AI Act | 52021PC0206 | ~270 | EUR-Lex fetch |
+| GDPR | 32016R0679 | 99 | EUR-Lex fetch |
+| AI Act | 52021PC0206 | 258 | EUR-Lex fetch, cleaned from proposal noise |
 | Digital Services Act | 32022R2065 | 93 | EUR-Lex fetch, one chunk per article |
-| Digital Markets Act | 32022R1925 | ~180 | EUR-Lex fetch |
-| NIS2 Directive | 32022L2555 | 46 | EUR-Lex fetch |
-| Cyber Resilience Act | 32024R2847 | pending | CELEX ID confirmed, seed pending |
+| Digital Markets Act | 32022R1925 | 53 | EUR-Lex fetch |
+| NIS2 Directive | 32022L2555 | 45 | EUR-Lex fetch |
+| Cyber Resilience Act | 32024R2847 | 71 | EUR-Lex fetch |
 
 ### 3.2 Chunking strategy
 
@@ -135,7 +135,7 @@ Fallback: if EUR-Lex fetch fails, reads from `scripts/data/{regulation}.txt`.
 create table legal_chunks (
     id uuid default gen_random_uuid() primary key,
     content text not null,
-    embedding vector(768) not null,
+    embedding vector(1536) not null,
     metadata jsonb not null,
     regulation text generated always as (metadata->>'regulation') stored,
     article text generated always as (metadata->>'article') stored,

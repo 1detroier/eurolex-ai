@@ -23,12 +23,12 @@ These properties make the system trustworthy enough to use in domains where gett
 
 | Regulation | CELEX ID | Chunks |
 |-----------|----------|--------|
-| GDPR | 32016R0679 | ~250 |
-| AI Act | 52021PC0206 | ~270 |
+| GDPR | 32016R0679 | 99 |
+| AI Act | 52021PC0206 | 258 |
 | Digital Services Act | 32022R2065 | 93 |
-| Digital Markets Act | 32022R1925 | ~180 |
-| NIS2 Directive | 32022L2555 | 46 |
-| Cyber Resilience Act | 32024R2847 | pending seed |
+| Digital Markets Act | 32022R1925 | 53 |
+| NIS2 Directive | 32022L2555 | 45 |
+| Cyber Resilience Act | 32024R2847 | 71 |
 
 ---
 
@@ -39,10 +39,10 @@ These properties make the system trustworthy enough to use in domains where gett
 | Frontend | Next.js 14 (App Router), React 18, Tailwind CSS, shadcn/ui |
 | API | Next.js Route Handlers, custom Server-Sent Events streaming |
 | LLM | Groq `llama-3.3-70b-versatile` (primary) · Cerebras `llama3.1-8b` (fallback) |
-| Embeddings | HuggingFace Inference API — `all-mpnet-base-v2` (768-dim) |
+| Embeddings | Google AI Studio — `gemini-embedding-001` (1536-dim) |
 | Vector DB | Supabase PostgreSQL + pgvector |
 | Search | Hybrid: pgvector cosine similarity + tsvector full-text search, fused via Reciprocal Rank Fusion |
-| ETL | Python, BeautifulSoup, Sentence-Transformers, EUR-Lex SPARQL + content negotiation |
+| ETL | Python, BeautifulSoup, Google AI Embeddings API, EUR-Lex SPARQL + content negotiation |
 | Deployment | Vercel |
 
 ---
@@ -59,7 +59,7 @@ These properties make the system trustworthy enough to use in domains where gett
 ┌─────────────────────────────────────────────────────┐
 │  /api/chat  (Next.js Route Handler)                  │
 │  1. Detect regulation from sidebar filter            │
-│  2. generateEmbedding(query)  → HuggingFace API     │
+│  2. generateEmbedding(query)  → Google AI (gemini-embedding-001) │
 │  3. hybridSearch(ftsQuery, embedding, regulation)    │
 │     → Supabase RPC  hybrid_search_rrf               │
 │  4. buildContext(chunks)  +  prompt template         │
@@ -70,7 +70,7 @@ These properties make the system trustworthy enough to use in domains where gett
                        ▼
 ┌─────────────────────────────────────────────────────┐
 │  Supabase  (PostgreSQL + pgvector)                   │
-│  legal_chunks: content, embedding(768), metadata     │
+│  legal_chunks: content, embedding(1536), metadata    │
 │  tsvector column + GIN index  (full-text search)     │
 │  RPC: hybrid_search_rrf  (vector + FTS fused)        │
 │  RPC: match_legal_chunks  (vector-only fallback)     │
@@ -86,7 +86,7 @@ EUR-Lex SPARQL  ──►  XHTML fetch (content negotiation, /DOC_1 redirect)
               BeautifulSoup parse  ──►  Article chunking
                                        │
                                        ▼
-                              all-mpnet-base-v2 (local)  ──►  Supabase insert
+                               gemini-embedding-001 (Google AI)  ──►  Supabase insert
 ```
 
 ---
@@ -98,7 +98,7 @@ EUR-Lex SPARQL  ──►  XHTML fetch (content negotiation, /DOC_1 redirect)
 - Node 18+
 - Python 3.10+ (for ETL only)
 - A Supabase project (free tier, EU region recommended)
-- API keys: Groq, Cerebras, HuggingFace
+- API keys: Groq, Cerebras, Google AI Studio
 
 ### 1. Install
 
@@ -125,8 +125,8 @@ Then edit both files with your real credentials. **Never commit `.env` or `.env.
 CEREBRAS_API_KEY=your_cerebras_api_key_here
 GROQ_API_KEY=your_groq_api_key_here
 
-# Embeddings (HuggingFace Inference API - free tier)
-HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+# Embeddings (Google AI Studio - gemini-embedding-001, 1536 dims, free tier)
+GOOGLE_AI_API_KEY=your_google_ai_api_key_here
 
 # Database (Supabase)
 SUPABASE_URL=https://your-project-id.supabase.co
@@ -172,7 +172,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. **User types a query** (e.g. "DSA obligations for very large platforms").
 2. `expandQuery` detects acronyms and expands them — `dsa` → `"digital services act very large online platforms moderation systemic risk obligations"` — so full-text search matches the correct documents.
-3. `generateEmbedding` sends the query to HuggingFace and returns a 768-dim vector.
+3. `generateEmbedding` sends the query to Google AI Studio and returns a 1536-dim vector.
 4. `hybrid_search_rrf` (Supabase RPC) runs:
    - `tsvector` search with `websearch_to_tsquery` (ranked by `ts_rank_cd`).
    - `pgvector` cosine similarity search.
@@ -195,10 +195,10 @@ EuroLex AI ships with EU regulations, but the pipeline and schema are document-a
 
 ### 2. Embeddings model
 
-- The default model is `all-mpnet-base-v2` (768 dimensions). If you switch models, update:
+- The default model is `gemini-embedding-001` via Google AI Studio (1536 dimensions). If you switch models, update:
   - `scripts/seed_legal.py` → `EMBEDDING_MODEL` and `EMBEDDING_DIMS`
-  - `lib/ai/embeddings.ts` → `HF_API_URL` and `EXPECTED_DIMENSIONS`
-  - Supabase column type: `vector(768)` → `vector(new_dim)`
+  - `lib/ai/embeddings.ts` → `GOOGLE_API_URL` and `EXPECTED_DIMENSIONS`
+  - Supabase column type: `vector(1536)` → `vector(new_dim)`
   - Rebuild the IVFFlat index
 
 ### 3. Citations (`lib/utils/citations.ts`)
