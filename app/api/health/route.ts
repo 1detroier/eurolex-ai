@@ -4,7 +4,7 @@
  * Tests connectivity to all external services:
  * - Cerebras LLM
  * - Groq LLM (fallback)
- * - HuggingFace Embeddings
+ * - Google AI Embeddings (gemini-embedding-001)
  * - Supabase Database
  */
 
@@ -54,13 +54,10 @@ export async function GET() {
       JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "user", content: "ping" }], max_tokens: 5 })
     ),
     checkProvider(
-      "huggingface",
-      "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",
-      {
-        Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY ?? ""}`,
-        "Content-Type": "application/json",
-      },
-      JSON.stringify({ inputs: ["ping"] })
+      "google-ai",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + (process.env.GOOGLE_AI_API_KEY ?? ""),
+      { "Content-Type": "application/json" },
+      JSON.stringify({ model: "models/gemini-embedding-001", content: { parts: [{ text: "ping" }] } })
     ),
   ]);
 

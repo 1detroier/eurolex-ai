@@ -144,8 +144,8 @@ REGULATIONS = {
     },
     "ai-act": {
         "name": "AI Act",
-        "celex_id": "52021PC0206",
-        "description": "Artificial Intelligence Act",
+        "celex_id": "32024R1689",
+        "description": "Artificial Intelligence Act (final regulation)",
     },
     "dsa": {
         "name": "Digital Services Act",
