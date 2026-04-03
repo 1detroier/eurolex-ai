@@ -182,6 +182,22 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
+## Embedding quality comparison
+
+The choice of embedding model has the single biggest impact on retrieval accuracy. We migrated from `all-mpnet-base-v2` (768d) to `gemini-embedding-001` (1536d) and measured the difference across all five suggestion prompts:
+
+| Question | Before (mpnet 768d) | After (Gemini 1536d) | Change |
+|----------|---------------------|----------------------|--------|
+| DSA obligations for VLOPs | ⭐⭐ — cited Art. 92 (dates), missed core obligations | ⭐⭐⭐⭐⭐ — cited Arts. 34-42 (risk, audit, compliance, data access) | **Massive** |
+| NIS2 incident reporting | ⭐⭐⭐⭐⭐ — correct Art. 23 | ⭐⭐⭐⭐ — correct Art. 23, slightly less detail | Same |
+| GDPR data retention | ⭐⭐⭐ — correct Art. 5, minimal | ⭐⭐⭐ — correct Art. 5, minimal | Same |
+| AI Act risk classification | ⭐ — "no information found" | ⭐⭐⭐⭐ — cited Arts. 6, 16, 73 (high-risk criteria) | **Drastic** |
+| DMA gatekeepers | ⭐⭐⭐⭐⭐ — 6 correct citations | ⭐⭐⭐⭐⭐ — 6 correct citations | Same |
+
+**Why it matters**: the old embedding model couldn't distinguish between "obligations for platforms" (DSA) and "obligations for gatekeepers" (DMA) — they're semantically similar. Gemini's 1536-dimensional vectors capture enough nuance to separate regulations with overlapping vocabulary.
+
+---
+
 ## Adapting to other document types
 
 EuroLex AI ships with EU regulations, but the pipeline and schema are document-agnostic. To point it at a different corpus — company policies, technical manuals, compliance reports, clinical protocols, or any structured documents — you need to adjust a few things:
