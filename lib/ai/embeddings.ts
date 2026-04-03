@@ -1,14 +1,14 @@
 /**
- * HuggingFace Inference API wrapper for generating text embeddings.
+ * Google AI Studio embeddings wrapper.
  *
- * Uses sentence-transformers/all-mpnet-base-v2 (768 dimensions).
+ * Uses gemini-embedding-001 (1536 dimensions).
  * This MUST match the model used during ETL to ensure vector compatibility.
  */
 
-const HF_API_URL =
-  "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-mpnet-base-v2/pipeline/feature-extraction";
+const GOOGLE_API_URL =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent";
 
-const EXPECTED_DIMENSIONS = 768;
+const EXPECTED_DIMENSIONS = 1536;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,79 +23,61 @@ function sleep(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Generate a 384-dimensional embedding for the given text via HuggingFace.
+ * Generate a 1536-dimensional embedding for the given text via Google AI Studio.
  *
  * Retry logic:
- * - 503 (cold start / model loading): wait `estimated_time` seconds, then retry
  * - 429 (rate limit): exponential backoff (1s, 2s, …), then retry
+ * - 500/503 (server error): retry up to maxRetries
  * - Any other error: throw immediately
  *
  * @param text - Text to embed (typically a user query)
- * @param maxRetries - Total attempts before giving up (default: 2, meaning 1 retry)
- * @returns 384-dimensional embedding vector
+ * @param maxRetries - Total attempts before giving up (default: 3)
+ * @returns 1536-dimensional embedding vector
  */
 export async function generateEmbedding(
   text: string,
-  maxRetries = 2
+  maxRetries = 3
 ): Promise<number[]> {
-  const apiKey = process.env.HUGGINGFACE_API_KEY;
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
   if (!apiKey) {
-    throw new Error("Missing HUGGINGFACE_API_KEY environment variable");
+    throw new Error("Missing GOOGLE_AI_API_KEY environment variable");
   }
 
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(HF_API_URL, {
+      const response = await fetch(`${GOOGLE_API_URL}?key=${apiKey}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ inputs: [text] }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "models/gemini-embedding-001",
+          content: { parts: [{ text }] },
+          outputDimensionality: EXPECTED_DIMENSIONS,
+        }),
       });
 
       // Success path
       if (response.ok) {
         const raw: unknown = await response.json();
+        const obj = raw as Record<string, unknown>;
+        const embeddingObj = obj.embedding as Record<string, unknown> | undefined;
+        const embedding = embeddingObj?.values as number[] | undefined;
 
-        // API returns 2D array [[...]] for feature-extraction; extract first
-        let embedding: number[];
-        if (Array.isArray(raw) && Array.isArray(raw[0])) {
-          embedding = raw[0] as number[];
-        } else if (Array.isArray(raw) && typeof raw[0] === "number") {
-          embedding = raw as number[];
-        } else {
+        if (!embedding || !Array.isArray(embedding)) {
           throw new Error(
-            `Unexpected response shape: expected number[] or number[][], got ${typeof raw}`
+            `Unexpected response shape: expected embedding.values array`
           );
         }
 
         if (embedding.length !== EXPECTED_DIMENSIONS) {
           throw new Error(
             `Expected ${EXPECTED_DIMENSIONS} dimensions, got ${embedding.length}. ` +
-              `Are you using the correct model (all-MiniLM-L6-v2)?`
+              `Are you using gemini-embedding-001 with outputDimensionality=1536?`
           );
         }
 
         return embedding;
-      }
-
-      // Cold start — model is loading
-      if (response.status === 503) {
-        let waitSeconds = 20; // Default if parsing fails
-        try {
-          const body = await response.json();
-          waitSeconds = body.estimated_time ?? waitSeconds;
-        } catch {
-          // Ignore parse errors — use default
-        }
-        console.warn(
-          `[embeddings] Model loading (503). Retrying in ${waitSeconds}s…`
-        );
-        await sleep(waitSeconds * 1000);
-        continue;
       }
 
       // Rate limit — exponential backoff
@@ -108,11 +90,21 @@ export async function generateEmbedding(
         continue;
       }
 
+      // Server error — retry
+      if (response.status >= 500) {
+        const waitMs = 1000 * (attempt + 1);
+        console.warn(
+          `[embeddings] Server error (${response.status}). Retrying in ${waitMs}ms…`
+        );
+        await sleep(waitMs);
+        continue;
+      }
+
       // Other error — don't retry
-      throw new Error(`HuggingFace API error: ${response.status} ${response.statusText}`);
+      const body = await response.text().catch(() => "unknown");
+      throw new Error(`Google AI API error: ${response.status} ${body}`);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      // Only network/fetch errors reach here — retry them
       if (attempt < maxRetries - 1) {
         const waitMs = 1000 * (attempt + 1);
         console.warn(
@@ -124,6 +116,6 @@ export async function generateEmbedding(
   }
 
   throw new Error(
-    `HuggingFace API: max retries (${maxRetries}) exceeded. Last error: ${lastError?.message}`
+    `Google AI API: max retries (${maxRetries}) exceeded. Last error: ${lastError?.message}`
   );
 }

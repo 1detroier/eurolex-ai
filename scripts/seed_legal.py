@@ -39,7 +39,6 @@ import numpy as np
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
 from supabase import create_client
 from tqdm import tqdm
 
@@ -51,8 +50,90 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 # Config
 CHUNK_SIZE = 500  # characters
 CHUNK_OVERLAP = 50  # characters
-EMBEDDING_MODEL = "all-mpnet-base-v2"
-EMBEDDING_DIMS = 768
+EMBEDDING_MODEL = "gemini-embedding-001"
+EMBEDDING_DIMS = 1536
+GOOGLE_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"
+EMBEDDING_BATCH_SIZE = 5  # Google AI allows up to 5 texts per batch request
+
+
+# ---------------------------------------------------------------------------
+# Google AI Embeddings
+# ---------------------------------------------------------------------------
+
+def get_google_embeddings(texts: list[str], api_key: str) -> list[list[float] | None]:
+    """Get embeddings for a batch of texts via Google AI Studio API.
+    
+    Returns a list of embeddings (or None for failed ones).
+    """
+    url = f"{GOOGLE_API_URL}?key={api_key}"
+    results: list[list[float] | None] = [None] * len(texts)
+    
+    # Google API accepts max 5 texts per batch via batchEmbedContents
+    batch_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key={api_key}"
+    
+    requests_list = []
+    for i, text in enumerate(texts):
+        requests_list.append({
+            "model": "models/gemini-embedding-001",
+            "content": {"parts": [{"text": text}]},
+            "outputDimensionality": EMBEDDING_DIMS,
+        })
+    
+    # Try batch embedding first with retry
+    for attempt in range(3):
+        try:
+            resp = requests.post(batch_url, json={"requests": requests_list}, timeout=60)
+            
+            if resp.status_code == 429:
+                wait = (attempt + 1) * 3
+                logger.warning(f"Batch rate limited, retry {attempt+1}, waiting {wait}s")
+                time.sleep(wait)
+                continue
+            
+            resp.raise_for_status()
+            data = resp.json()
+            for i, emb_obj in enumerate(data.get("embeddings", [])):
+                values = emb_obj.get("values", [])
+                if len(values) == EMBEDDING_DIMS:
+                    results[i] = values
+                else:
+                    logger.warning(f"Embedding {i}: expected {EMBEDDING_DIMS} dims, got {len(values)}")
+            return results
+        except Exception as e:
+            logger.warning(f"Batch embedding failed (attempt {attempt+1}): {e}")
+            if attempt < 2:
+                time.sleep((attempt + 1) * 3)
+    
+    logger.warning("Batch embedding exhausted retries, falling back to individual")
+    
+    # Fallback: individual requests with retry + backoff
+    for i, text in enumerate(texts):
+        for attempt in range(3):
+            try:
+                resp = requests.post(url, json={
+                    "model": "models/gemini-embedding-001",
+                    "content": {"parts": [{"text": text}]},
+                    "outputDimensionality": EMBEDDING_DIMS,
+                }, timeout=30)
+                
+                if resp.status_code == 429:
+                    wait = (attempt + 1) * 2
+                    logger.warning(f"Rate limited on text {i}, retry {attempt+1}, waiting {wait}s")
+                    time.sleep(wait)
+                    continue
+                
+                resp.raise_for_status()
+                values = resp.json().get("embedding", {}).get("values", [])
+                if len(values) == EMBEDDING_DIMS:
+                    results[i] = values
+                break
+            except Exception as e:
+                logger.warning(f"Individual embedding {i} failed (attempt {attempt+1}): {e}")
+                if attempt < 2:
+                    time.sleep((attempt + 1) * 2)
+        time.sleep(0.3)  # Rate limit courtesy between individual requests
+    
+    return results
 
 # Regulation metadata
 REGULATIONS = {
@@ -557,14 +638,14 @@ def chunk_text(text: str, regulation_key: str) -> list[dict]:
 def process_regulation_from_xhtml(
     xhtml: str,
     regulation_key: str,
-    model: SentenceTransformer,
+    api_key: str,
 ) -> list[dict]:
     """Process XHTML into chunks with embeddings (EUR-Lex pipeline).
 
     Args:
         xhtml: Raw XHTML from EUR-Lex.
         regulation_key: Key in REGULATIONS dict.
-        model: SentenceTransformer model for embeddings.
+        api_key: Google AI API key for embeddings.
 
     Returns:
         List of chunks with embeddings attached.
@@ -581,13 +662,19 @@ def process_regulation_from_xhtml(
     if not chunks:
         return []
 
-    # Generate embeddings
+    # Generate embeddings via Google AI API
     print(f"  Generating embeddings ({len(chunks)} texts)...")
     texts = [c["content"] for c in chunks]
-    embeddings = model.encode(texts, show_progress_bar=True, batch_size=32)
-
-    for chunk, emb in zip(chunks, embeddings):
-        chunk["embedding"] = emb.tolist()
+    
+    # Process in batches
+    for i in tqdm(range(0, len(texts), EMBEDDING_BATCH_SIZE)):
+        batch_texts = texts[i:i + EMBEDDING_BATCH_SIZE]
+        batch_chunks = chunks[i:i + EMBEDDING_BATCH_SIZE]
+        embeddings = get_google_embeddings(batch_texts, api_key)
+        
+        for chunk, emb in zip(batch_chunks, embeddings):
+            if emb is not None:
+                chunk["embedding"] = emb
 
     return chunks
 
@@ -595,7 +682,7 @@ def process_regulation_from_xhtml(
 def process_regulation_from_file(
     file_path: Path,
     regulation_key: str,
-    model: SentenceTransformer,
+    api_key: str,
 ) -> list[dict]:
     """Fallback: process .txt file with old character-based chunking.
 
@@ -613,10 +700,16 @@ def process_regulation_from_file(
 
     print(f"  Generating embeddings...")
     texts = [c["content"] for c in chunks]
-    embeddings = model.encode(texts, show_progress_bar=True, batch_size=32)
-
-    for chunk, emb in zip(chunks, embeddings):
-        chunk["embedding"] = emb.tolist()
+    
+    # Process in batches
+    for i in tqdm(range(0, len(texts), EMBEDDING_BATCH_SIZE)):
+        batch_texts = texts[i:i + EMBEDDING_BATCH_SIZE]
+        batch_chunks = chunks[i:i + EMBEDDING_BATCH_SIZE]
+        embeddings = get_google_embeddings(batch_texts, api_key)
+        
+        for chunk, emb in zip(batch_chunks, embeddings):
+            if emb is not None:
+                chunk["embedding"] = emb
 
     return chunks
 
@@ -634,10 +727,16 @@ def insert_into_supabase(chunks: list[dict]) -> int:
 
     print(f"\nInserting {len(chunks)} chunks into Supabase...")
 
+    # Filter out chunks that failed embedding
+    valid_chunks = [c for c in chunks if "embedding" in c]
+    failed = len(chunks) - len(valid_chunks)
+    if failed > 0:
+        print(f"  WARNING: {failed} chunks missing embeddings (rate limited), skipping")
+
     # Batch insert (Supabase handles up to 1000 rows per request)
     batch_size = 100
-    for i in tqdm(range(0, len(chunks), batch_size)):
-        batch = chunks[i : i + batch_size]
+    for i in tqdm(range(0, len(valid_chunks), batch_size)):
+        batch = valid_chunks[i : i + batch_size]
         rows = [
             {
                 "content": c["content"],
@@ -694,10 +793,13 @@ def main():
     print(f"  Mode: {'DRY RUN' if args.dry_run else 'LIVE INSERT'}")
     print(f"{'='*60}")
 
-    # Load embedding model
-    print(f"\nLoading embedding model: {EMBEDDING_MODEL}")
-    model = SentenceTransformer(EMBEDDING_MODEL)
-    print(f"  Model loaded ({EMBEDDING_DIMS} dimensions)")
+    # Get Google AI API key
+    api_key = os.environ.get("GOOGLE_AI_API_KEY")
+    if not api_key:
+        print("ERROR: Missing GOOGLE_AI_API_KEY in .env")
+        return
+
+    print(f"\nEmbedding model: {EMBEDDING_MODEL} (Google AI Studio, {EMBEDDING_DIMS} dims)")
 
     # Process each regulation
     all_chunks = []
@@ -716,7 +818,7 @@ def main():
             print(f"  Fetching XHTML from EUR-Lex...")
             xhtml = fetch_regulation_xhtml(celex_id)
             print(f"  XHTML fetched ({len(xhtml):,} chars)")
-            chunks = process_regulation_from_xhtml(xhtml, reg_key, model)
+            chunks = process_regulation_from_xhtml(xhtml, reg_key, api_key)
             stats["success"] += 1
         except EURLexError as e:
             print(f"  EUR-Lex fetch FAILED: {e}")
@@ -725,7 +827,7 @@ def main():
             # Fallback to .txt file
             txt_file = data_dir / f"{reg_key}.txt"
             if txt_file.exists():
-                chunks = process_regulation_from_file(txt_file, reg_key, model)
+                chunks = process_regulation_from_file(txt_file, reg_key, api_key)
                 stats["fallback"] += 1
             else:
                 print(f"  No fallback file found: {txt_file}")
