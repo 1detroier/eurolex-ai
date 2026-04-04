@@ -20,6 +20,48 @@ interface ChatContainerProps {
   selectedRegulation?: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// User-friendly error messages
+// ---------------------------------------------------------------------------
+
+const FRIENDLY_ERRORS: Record<string, string> = {
+  "Embedding service unavailable":
+    "I'm having trouble processing your question right now. Please try again in a moment.",
+  "AI service unavailable":
+    "My brain is taking a short break. Please wait a few seconds and try again.",
+  "Message is required":
+    "Please type a question before sending.",
+};
+
+function getFriendlyErrorMessage(status: number, errorCode: string): string {
+  // Check for known error codes first
+  for (const [code, msg] of Object.entries(FRIENDLY_ERRORS)) {
+    if (errorCode.includes(code)) return msg;
+  }
+
+  // Map HTTP status codes to friendly messages
+  switch (status) {
+    case 400:
+      return "I couldn't understand your request. Please try rephrasing your question.";
+    case 429:
+      return "You're sending messages too quickly. Please wait a moment before trying again.";
+    case 500:
+      return "Something went wrong on my end. Please try again in a moment.";
+    case 503:
+      return "I'm temporarily unavailable. Please wait a few seconds and try again.";
+    case 0:
+    default:
+      return "I couldn't connect to the server. Please check your internet connection and try again.";
+  }
+}
+
+function getFriendlyErrorFromMessage(errorMsg: string): string {
+  for (const [code, msg] of Object.entries(FRIENDLY_ERRORS)) {
+    if (errorMsg.includes(code)) return msg;
+  }
+  return "Something went wrong while generating a response. Please try again.";
+}
+
 export function ChatContainer({ selectedRegulation = null }: ChatContainerProps) {
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -57,49 +99,57 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
         timestamp: Date.now(),
       };
 
-      // Add placeholder assistant message for streaming
-      const assistantMessage: ChatMessage = {
-        role: "assistant",
-        content: "",
-        citations: [],
-        timestamp: Date.now() + 1,
-      };
+      setMessages((prev) => [...prev, userMessage]);
 
-      setMessages((prev) => [...prev, userMessage, assistantMessage]);
-      setIsLoading(true);
+      // Add placeholder assistant message
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "", timestamp: Date.now() },
+      ]);
 
       try {
-        // Build history: last 10 messages (excluding the placeholder)
-        const history = messages.slice(-10).map((m) => ({
-          role: m.role,
-          content: m.content,
-          timestamp: m.timestamp,
-        }));
-
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: text.trim(),
-            history,
+            history: messages,
             regulation: selectedRegulation,
           }),
           signal: controller.signal,
         });
 
+        // Handle non-200 responses with user-friendly messages
         if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
+          const errorBody = await response.json().catch(() => null);
+          const errorCode = errorBody?.error ?? "";
+          const friendlyMsg = getFriendlyErrorMessage(response.status, errorCode);
+
+          if (isStaleStream()) return;
+
+          setMessages((prev) => {
+            if (activeStreamIdRef.current !== streamId) return prev;
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last && last.role === "assistant" && !last.content) {
+              updated[updated.length - 1] = {
+                ...last,
+                content: friendlyMsg,
+              };
+            }
+            return updated;
+          });
+          return;
         }
 
-        if (!response.body) {
-          throw new Error("No response body");
-        }
+        // ── Stream SSE response ───────────────────────────────────────────
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No reader available");
 
-        // Parse SSE stream
-        const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
         let accumulatedContent = "";
+        let currentEventType = "";
 
         while (true) {
           if (isStaleStream()) {
@@ -117,12 +167,8 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
 
           buffer += decoder.decode(value, { stream: true });
 
-          // Parse SSE events from buffer
           const lines = buffer.split("\n");
-          // Keep the last potentially incomplete line in the buffer
           buffer = lines.pop() ?? "";
-
-          let currentEventType = "";
 
           for (const line of lines) {
             if (line.startsWith("event: ")) {
@@ -130,10 +176,10 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
             } else if (line.startsWith("data: ")) {
               const dataStr = line.slice(6).trim();
 
-              if (!dataStr || !currentEventType) continue;
+              if (!dataStr || dataStr === "[DONE]") continue;
 
               try {
-                const data = JSON.parse(dataStr);
+                const data = JSON.parse(dataStr) as Record<string, unknown>;
 
                 switch (currentEventType) {
                   case "chunk": {
@@ -156,7 +202,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
 
                   case "citation": {
                     if (isStaleStream()) break;
-                    const citeData = data as CitationEventData;
+                    const citeData = data as unknown as CitationEventData;
                     const citation: Citation = {
                       id: `${citeData.regulation}:${citeData.article}`,
                       regulation: citeData.regulation,
@@ -164,7 +210,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
                       celex_id: citeData.celexId,
                       eurlex_url: citeData.eurlexUrl,
                       chunk_content: citeData.excerpt,
-                      similarity: citeData.similarity ?? 0,
+                      similarity: citeData.similarity,
                     };
 
                     setMessages((prev) => {
@@ -198,7 +244,9 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
                   case "error": {
                     if (isStaleStream()) break;
                     const errorMsg =
-                      data.message || "An error occurred during the response.";
+                      typeof data.message === "string"
+                        ? data.message
+                        : "An error occurred during the response.";
                     setMessages((prev) => {
                       if (isStaleStream()) return prev;
                       const updated = [...prev];
@@ -206,7 +254,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
                       if (last && last.role === "assistant" && !last.content) {
                         updated[updated.length - 1] = {
                           ...last,
-                          content: `⚠️ ${errorMsg}`,
+                          content: getFriendlyErrorFromMessage(errorMsg),
                         };
                       }
                       return updated;
@@ -232,7 +280,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
         }
 
         console.error("Chat request failed:", error);
-        // Update the placeholder assistant message with an error
+        // Update the placeholder assistant message with a friendly error
         setMessages((prev) => {
           if (activeStreamIdRef.current !== streamId) return prev;
           const updated = [...prev];
@@ -240,8 +288,7 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
           if (last && last.role === "assistant" && !last.content) {
             updated[updated.length - 1] = {
               ...last,
-              content:
-                "⚠️ Sorry, I couldn't connect to the server. Please try again later.",
+              content: getFriendlyErrorMessage(0, ""),
             };
           }
           return updated;
@@ -278,28 +325,17 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
         onOpenCitationModal={handleOpenCitationModal}
         onSuggestion={sendMessage}
       />
-
-      {/* Action toolbar */}
-      {messages.length > 0 && (
-        <div className="flex justify-end gap-2 border-t border-border px-3 py-2 sm:px-4">
-          <div className="mx-auto flex w-full max-w-[800px] justify-end gap-2">
-            <PDFExport messages={messages} />
-            <button
-              onClick={handleClearChat}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[hsl(var(--neutral-20))] bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-[hsl(var(--neutral-10))] hover:text-foreground"
-            >
-              New chat
-            </button>
-          </div>
-        </div>
-      )}
-
-      <ChatInput onSend={sendMessage} disabled={isLoading} />
+      <ChatInput
+        onSend={sendMessage}
+        disabled={isLoading}
+        maxLength={4000}
+      />
       <CitationModal
         citation={selectedCitation}
         open={citationModalOpen}
         onOpenChange={setCitationModalOpen}
       />
+      <PDFExport messages={messages} />
     </div>
   );
 }
