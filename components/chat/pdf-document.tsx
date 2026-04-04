@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 4,
-    marginTop: 6,
-    marginBottom: 4,
+    marginTop: 4,
+    marginBottom: 12,
   },
   citationTag: {
     backgroundColor: COLORS.tagBg,
@@ -116,14 +116,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
-  // Compact sources table
-  sourcesTable: {
-    marginTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    borderTopStyle: "solid",
-    paddingTop: 4,
-  },
+  // Compact sources table (only at end of document)
   sourcesHeader: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -272,38 +265,13 @@ export function ChatPDFDocument({ messages }: ChatPDFDocumentProps) {
               <Text style={styles.answerText}>{stripCitations(pair.answer)}</Text>
             </View>
 
-            {/* Compact citation tags + sources table */}
+            {/* Compact citation tags (no table per answer) */}
             {pair.citations.length > 0 && (
-              <View style={styles.sourcesTable}>
-                {/* Inline citation tags */}
-                <View style={styles.citationsRow}>
-                  {pair.citations.map((c, j) => (
-                    <Text key={j} style={styles.citationTag}>
-                      {c.regulation} — {c.article}
-                    </Text>
-                  ))}
-                </View>
-
-                {/* Compact sources table (only shown once per Q&A) */}
-                <View style={styles.sourcesHeader}>
-                  <Text style={[styles.sourcesHeaderCell, styles.colReg]}>Regulation</Text>
-                  <Text style={[styles.sourcesHeaderCell, styles.colArt]}>Article</Text>
-                  <Text style={[styles.sourcesHeaderCell, styles.colLink]}>Source</Text>
-                </View>
+              <View style={styles.citationsRow}>
                 {pair.citations.map((c, j) => (
-                  <View key={j} style={styles.sourceRow}>
-                    <Text style={[styles.sourceCell, styles.colReg]}>{c.regulation}</Text>
-                    <Text style={[styles.sourceCell, styles.colArt]}>{c.article}</Text>
-                    <Text style={[styles.colLink]}>
-                      {c.eurlex_url ? (
-                        <Link src={c.eurlex_url} style={styles.sourceLink}>
-                          View on EUR-Lex →
-                        </Link>
-                      ) : (
-                        <Text style={styles.sourceCell}>—</Text>
-                      )}
-                    </Text>
-                  </View>
+                  <Text key={j} style={styles.citationTag}>
+                    {c.regulation} — {c.article}
+                  </Text>
                 ))}
               </View>
             )}
