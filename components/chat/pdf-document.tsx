@@ -17,11 +17,12 @@ const COLORS = {
   bodyText: "#334155",
   labelUser: "#0f766e",
   labelAssistant: "#4338ca",
-  citationBorder: "#94a3b8",
   muted: "#64748b",
   border: "#e2e8f0",
   accentBg: "#f8fafc",
   linkColor: "#2563eb",
+  tagBg: "#e0f2fe",
+  tagText: "#0369a1",
 };
 
 const styles = StyleSheet.create({
@@ -53,13 +54,13 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
   },
 
-  // Report sections
+  // Section title
   sectionTitle: {
     fontFamily: "Helvetica-Bold",
     fontSize: 12,
     color: COLORS.headerBg,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 20,
+    marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     borderBottomStyle: "solid",
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
     borderLeftColor: COLORS.labelUser,
     borderLeftStyle: "solid",
     padding: 10,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   queryLabel: {
     fontFamily: "Helvetica-Bold",
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
 
   // Answer block
   answerBlock: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
   answerText: {
     fontSize: 10,
@@ -97,55 +98,64 @@ const styles = StyleSheet.create({
     textAlign: "justify",
   },
 
-  // Inline citation reference
-  citationRef: {
+  // Compact citation tags (inline-style)
+  citationsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  citationTag: {
+    backgroundColor: COLORS.tagBg,
+    color: COLORS.tagText,
     fontFamily: "Helvetica-Bold",
-    fontSize: 9,
-    color: COLORS.linkColor,
+    fontSize: 7,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 3,
   },
 
-  // Sources section
-  sourcesSection: {
-    marginTop: 12,
-    backgroundColor: COLORS.accentBg,
-    borderRadius: 4,
-    padding: 10,
+  // Compact sources table
+  sourcesTable: {
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    borderTopStyle: "solid",
+    paddingTop: 4,
   },
-  sourcesTitle: {
+  sourcesHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    borderBottomStyle: "solid",
+    paddingBottom: 2,
+    marginBottom: 2,
+  },
+  sourcesHeaderCell: {
     fontFamily: "Helvetica-Bold",
-    fontSize: 9,
+    fontSize: 7,
     color: COLORS.muted,
     textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 6,
+    letterSpacing: 0.3,
   },
-  sourceItem: {
-    marginBottom: 6,
-    paddingLeft: 8,
-    borderLeftWidth: 2,
-    borderLeftColor: COLORS.citationBorder,
-    borderLeftStyle: "solid",
+  sourceRow: {
+    flexDirection: "row",
+    paddingVertical: 2,
   },
-  sourceRegulation: {
-    fontFamily: "Helvetica-Bold",
-    fontSize: 9,
+  sourceCell: {
+    fontSize: 7,
     color: COLORS.bodyText,
-  },
-  sourceArticle: {
-    fontSize: 8,
-    color: COLORS.muted,
-  },
-  sourceExcerpt: {
-    fontSize: 8,
-    color: COLORS.muted,
-    marginTop: 2,
-    fontStyle: "italic",
   },
   sourceLink: {
     fontSize: 7,
     color: COLORS.linkColor,
-    marginTop: 1,
   },
+
+  // Column widths for sources table
+  colReg: { flex: 2 },
+  colArt: { flex: 1.5 },
+  colLink: { flex: 2 },
 
   // Footer
   footer: {
@@ -195,7 +205,7 @@ function formatDate(ts: number): string {
  * Strip citation markers from text for clean display.
  */
 function stripCitations(text: string): string {
-  return text.replace(/\(([A-Za-z\s]+?)-Article\s+(\d+)\)/g, "").replace(/\s{2,}/g, " ");
+  return text.replace(/\[\[([A-Za-z\s]+?)\s*-?\s*(?:Article\s+\d+)?\]\]/g, "").replace(/\s{2,}/g, " ").trim();
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +233,7 @@ export function ChatPDFDocument({ messages }: ChatPDFDocumentProps) {
     }
   }
 
-  // Collect all unique citations
+  // Collect all unique citations across all answers
   const allCitations = messages
     .filter((m) => m.role === "assistant" && m.citations && m.citations.length > 0)
     .flatMap((m) => m.citations!);
@@ -262,26 +272,37 @@ export function ChatPDFDocument({ messages }: ChatPDFDocumentProps) {
               <Text style={styles.answerText}>{stripCitations(pair.answer)}</Text>
             </View>
 
-            {/* Sources for this answer */}
+            {/* Compact citation tags + sources table */}
             {pair.citations.length > 0 && (
-              <View style={styles.sourcesSection}>
-                <Text style={styles.sourcesTitle}>Sources</Text>
+              <View style={styles.sourcesTable}>
+                {/* Inline citation tags */}
+                <View style={styles.citationsRow}>
+                  {pair.citations.map((c, j) => (
+                    <Text key={j} style={styles.citationTag}>
+                      {c.regulation} — {c.article}
+                    </Text>
+                  ))}
+                </View>
+
+                {/* Compact sources table (only shown once per Q&A) */}
+                <View style={styles.sourcesHeader}>
+                  <Text style={[styles.sourcesHeaderCell, styles.colReg]}>Regulation</Text>
+                  <Text style={[styles.sourcesHeaderCell, styles.colArt]}>Article</Text>
+                  <Text style={[styles.sourcesHeaderCell, styles.colLink]}>Source</Text>
+                </View>
                 {pair.citations.map((c, j) => (
-                  <View key={j} style={styles.sourceItem}>
-                    <Text style={styles.sourceRegulation}>{c.regulation}</Text>
-                    <Text style={styles.sourceArticle}>{c.article} · CELEX: {c.celex_id}</Text>
-                    {c.chunk_content && (
-                      <Text style={styles.sourceExcerpt}>
-                        {c.chunk_content.length > 200
-                          ? c.chunk_content.slice(0, 200) + "…"
-                          : c.chunk_content}
-                      </Text>
-                    )}
-                    {c.eurlex_url && (
-                      <Link src={c.eurlex_url} style={styles.sourceLink}>
-                        View on EUR-Lex →
-                      </Link>
-                    )}
+                  <View key={j} style={styles.sourceRow}>
+                    <Text style={[styles.sourceCell, styles.colReg]}>{c.regulation}</Text>
+                    <Text style={[styles.sourceCell, styles.colArt]}>{c.article}</Text>
+                    <Text style={[styles.colLink]}>
+                      {c.eurlex_url ? (
+                        <Link src={c.eurlex_url} style={styles.sourceLink}>
+                          View on EUR-Lex →
+                        </Link>
+                      ) : (
+                        <Text style={styles.sourceCell}>—</Text>
+                      )}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -289,18 +310,28 @@ export function ChatPDFDocument({ messages }: ChatPDFDocumentProps) {
           </View>
         ))}
 
-        {/* All Sources Summary */}
+        {/* All unique sources summary — compact table */}
         {uniqueCitations.length > 0 && (
           <View wrap>
             <Text style={styles.sectionTitle}>All Cited Sources ({uniqueCitations.length})</Text>
+            <View style={styles.sourcesHeader}>
+              <Text style={[styles.sourcesHeaderCell, styles.colReg]}>Regulation</Text>
+              <Text style={[styles.sourcesHeaderCell, styles.colArt]}>Article</Text>
+              <Text style={[styles.sourcesHeaderCell, styles.colLink]}>Source</Text>
+            </View>
             {uniqueCitations.map((c, i) => (
-              <View key={i} style={styles.sourceItem}>
-                <Text style={styles.sourceRegulation}>{c.regulation} — {c.article}</Text>
-                {c.eurlex_url && (
-                  <Link src={c.eurlex_url} style={styles.sourceLink}>
-                    {c.eurlex_url}
-                  </Link>
-                )}
+              <View key={i} style={styles.sourceRow}>
+                <Text style={[styles.sourceCell, styles.colReg]}>{c.regulation}</Text>
+                <Text style={[styles.sourceCell, styles.colArt]}>{c.article}</Text>
+                <Text style={[styles.colLink]}>
+                  {c.eurlex_url ? (
+                    <Link src={c.eurlex_url} style={styles.sourceLink}>
+                      View on EUR-Lex →
+                    </Link>
+                  ) : (
+                    <Text style={styles.sourceCell}>—</Text>
+                  )}
+                </Text>
               </View>
             ))}
           </View>
