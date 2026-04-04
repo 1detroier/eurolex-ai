@@ -325,6 +325,21 @@ export function ChatContainer({ selectedRegulation = null }: ChatContainerProps)
         onOpenCitationModal={handleOpenCitationModal}
         onSuggestion={sendMessage}
       />
+      {/* Action toolbar */}
+      {messages.length > 0 && (
+        <div className="flex justify-end gap-2 border-t border-border px-3 py-2 sm:px-4">
+          <div className="mx-auto flex w-full max-w-[800px] justify-end gap-2">
+            <PDFExport messages={messages} />
+            <button
+              onClick={handleClearChat}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[hsl(var(--neutral-20))] bg-background px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-[hsl(var(--neutral-10))] hover:text-foreground"
+            >
+              New chat
+            </button>
+          </div>
+        </div>
+      )}
+
       <ChatInput
         onSend={sendMessage}
         disabled={isLoading}
